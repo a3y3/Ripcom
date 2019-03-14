@@ -47,6 +47,7 @@ public class Rover extends Thread {
                 socket.receive(datagramPacket);
                 String received = new String(
                         datagramPacket.getData(), 0, datagramPacket.getLength());
+                 
                 if (received.equals("exit")) {
                     System.out.println("Exiting...");
                     break;
