@@ -78,7 +78,7 @@ public class Rover extends Thread {
 
     private void sendRIPMessage() {
         String message = "ID:" + roverID;
-        byte[] buffer = message.getBytes();
+        byte[] buffer = getRIPPacket(true);
         InetAddress iGroup = null;
 
         try {
@@ -100,15 +100,66 @@ public class Rover extends Thread {
     }
 
     /**
-     * Constructs a RIP packet and
+     * Constructs a RIP packet and returns the byte array formed.
      *
-     * @return
+     * @return the RIP packet in a byte array
      */
-    private byte[] getRIPBytes() {
-        int size = routingTable.size();
-        int numberOfBytes = 4 + 4 * 5 * size;
+    private byte[] getRIPPacket(boolean isRequest) {
+        ArrayList<Byte> arrayList = new ArrayList<>();
 
-        byte[] RIPPacket = new byte[numberOfBytes];
-        return RIPPacket;
+        byte command = (byte) (isRequest ? 1 : 2);
+        byte zero = 0;
+
+        arrayList.add(command);     // Command
+
+        byte version = 2;
+        arrayList.add(version);     // Version
+
+        arrayList.add(zero);
+        arrayList.add(zero);     // Unused
+
+        for (RoutingTableEntry r : routingTable) {
+            arrayList.add(zero);
+            arrayList.add((byte) 2);     // Address Family Identifier
+
+            byte routeTag = 1;
+            arrayList.add(routeTag);
+            arrayList.add(routeTag);    // Route Tag (placeholder 1 for now)
+
+            String ip = r.IPAddress;
+            String[] ipParts = ip.split(".");
+            for (String i : ipParts) {
+                byte ipPart = Byte.parseByte(i);
+                arrayList.add(ipPart);  // IP Address
+            }
+
+            byte subnetMask = r.mask;
+            arrayList.add(zero);
+            arrayList.add(zero);
+            arrayList.add(zero);
+            arrayList.add(subnetMask);  //Subnet Mask
+
+            String nextHop = r.nextHop;
+            ipParts = nextHop.split(".");
+            for (String i : ipParts) {
+                byte ipPart = Byte.parseByte(i);
+                arrayList.add(ipPart);  // Next Hop
+            }
+
+            byte cost = r.cost;
+            arrayList.add(zero);
+            arrayList.add(zero);
+            arrayList.add(zero);
+            arrayList.add(cost);        // Metric
+        }
+
+        int size = arrayList.size();
+        Byte[] bytes = arrayList.toArray(new Byte[size]);
+        byte[] ripPacket = new byte[size];
+        int i = 0;
+        for (byte b: bytes) {
+            ripPacket[i++] = b;
+        }
+        return ripPacket;
     }
 }
