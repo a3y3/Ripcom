@@ -27,7 +27,11 @@ public class Rover extends Thread {
 //        new Timer().scheduleAtFixedRate(new TimerTask() {
 //            @Override
 //            public void run() {
-//                sendRIPMessage();
+//                try {
+//                    sendRIPMessage();
+//                } catch (UnknownHostException e) {
+//                    e.printStackTrace();
+//                }
 //            }
 //        }, 0, UPDATE_FREQUENCY);
     }
@@ -50,10 +54,16 @@ public class Rover extends Thread {
         r.nextHop = "238.238.238.238";
         rover.routingTable.add(r);
         byte[] packet = rover.getRIPPacket(false);
-        for (int i = 0; i < packet.length; i++) {
-            System.out.printf("%02X " + ((i + 1) % 4 == 0 ? "\n" : ""),
-                    packet[i]);
+        ArrayList<RoutingTableEntry> arr = rover.decodeRIPPacket(packet);
+        System.out.println("Address\tNextHop\tCost");
+
+        for (RoutingTableEntry routingTableEntry : arr){
+            System.out.println(routingTableEntry.IPAddress + "\t" + routingTableEntry.nextHop + "\t" + routingTableEntry.cost);
         }
+//        for (int i = 0; i < packet.length; i++) {
+//            System.out.printf("%02X " + ((i + 1) % 4 == 0 ? "\n" : ""),
+//                    packet[i]);
+//        }
     }
 
     private void startListening() {
@@ -88,7 +98,6 @@ public class Rover extends Thread {
     }
 
     private void sendRIPMessage() throws UnknownHostException {
-        String message = "ID:" + roverID;
         byte[] buffer = getRIPPacket(true);
         InetAddress iGroup = null;
 
@@ -172,5 +181,86 @@ public class Rover extends Thread {
             ripPacket[i++] = b;
         }
         return ripPacket;
+    }
+
+    /**
+     * Decodes a RIP Packet and makes RoutingTableEntries out of it.
+     *
+     * @param ripPacket The received RIP packet
+     * @return An ArrayList of all possible RoutingTableEntries that can be
+     * constructed out of this packet.
+     */
+    private ArrayList<RoutingTableEntry> decodeRIPPacket(byte[] ripPacket) {
+        ArrayList<RoutingTableEntry> arrayList = new ArrayList<>();
+        int i = 0;
+        while (i < ripPacket.length) {
+            byte command = ripPacket[i++];
+
+            byte version = ripPacket[i++];
+
+            i += 2;
+
+            byte AFI[] = new byte[2];
+            AFI[0] = ripPacket[i++];
+            AFI[1] = ripPacket[i++];
+
+            byte[] routeTag = new byte[2];
+            routeTag[0] = ripPacket[i++];
+            routeTag[1] = ripPacket[i++];
+
+            int[] ipAddress = new int[4];
+            fillIPAddress(ipAddress, ripPacket, i);
+            i += 4;
+            String ipAddressStringForm = getIPAddressInStringForm(ipAddress);
+
+            i += 3;
+            byte subnetMask = ripPacket[i++];
+
+            int[] nextHop = new int[4];
+            fillIPAddress(nextHop, ripPacket, i);
+            i += 4;
+
+            i += 3;
+            String nextHopInStringForm = getIPAddressInStringForm(nextHop);
+
+
+            byte cost = ripPacket[i];
+
+            RoutingTableEntry r = new RoutingTableEntry(ipAddressStringForm,
+                    subnetMask, nextHopInStringForm, cost);
+            arrayList.add(r);
+            i++;
+        }
+        return arrayList;
+    }
+
+    /**
+     * Fills ipAddressp[] with the unsigned representation of the bytes from
+     * the RIP Packet.
+     *
+     * @param ipAddress the array that needs to be filled
+     * @param ripPacket the packet that contains the IP
+     * @param i         denotes what value to start from
+     */
+    private void fillIPAddress(int[] ipAddress, byte[] ripPacket, int i) {
+        for (int j = 0; j < 4; j++) {
+            ipAddress[j] = Byte.toUnsignedInt(ripPacket[i++]);
+        }
+    }
+
+    /**
+     * Constructs a String representation of the ipAddress
+     *
+     * @param ipAddress ipv4 address (int[] of length 4)
+     * @return the String representation of the address
+     */
+    private String getIPAddressInStringForm(int[] ipAddress) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < ipAddress.length; i++) {
+            sb.append(ipAddress[i]);
+            if (i < ipAddress.length - 1) sb.append(".");
+        }
+
+        return sb.toString();
     }
 }
