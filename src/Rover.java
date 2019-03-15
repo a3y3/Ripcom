@@ -47,12 +47,12 @@ public class Rover extends Thread {
         }
 
         Rover rover = new Rover(roverID);
-        RoutingTableEntry r = new RoutingTableEntry();
-        r.IPAddress = "255.255.255.255";
-        r.cost = 5;
-        r.mask = 24;
-        r.nextHop = "238.238.238.238";
+        RoutingTableEntry r = new RoutingTableEntry("255.255.255.255",
+                (byte)24,
+                "238.238.238.238", (byte)5);
         rover.routingTable.add(r);
+
+
         byte[] packet = rover.getRIPPacket(false);
         ArrayList<RoutingTableEntry> arr = rover.decodeRIPPacket(packet);
         System.out.println("Address\tNextHop\tCost");
@@ -60,10 +60,6 @@ public class Rover extends Thread {
         for (RoutingTableEntry routingTableEntry : arr){
             System.out.println(routingTableEntry.IPAddress + "\t" + routingTableEntry.nextHop + "\t" + routingTableEntry.cost);
         }
-//        for (int i = 0; i < packet.length; i++) {
-//            System.out.printf("%02X " + ((i + 1) % 4 == 0 ? "\n" : ""),
-//                    packet[i]);
-//        }
     }
 
     private void startListening() {
@@ -193,13 +189,12 @@ public class Rover extends Thread {
     private ArrayList<RoutingTableEntry> decodeRIPPacket(byte[] ripPacket) {
         ArrayList<RoutingTableEntry> arrayList = new ArrayList<>();
         int i = 0;
+        byte command = ripPacket[i++];
+
+        byte version = ripPacket[i++];
+
+        i += 2;
         while (i < ripPacket.length) {
-            byte command = ripPacket[i++];
-
-            byte version = ripPacket[i++];
-
-            i += 2;
-
             byte AFI[] = new byte[2];
             AFI[0] = ripPacket[i++];
             AFI[1] = ripPacket[i++];
