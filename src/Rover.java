@@ -5,24 +5,17 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 public class Rover extends Thread {
-    private int roverID; //can't use id, class Thread has an int id too.
-    private String MULTICAST_IP;
     private ArrayList<RoutingTableEntry> routingTable;
 
     private final static int MULTICAST_PORT = 20001;
     private final static int UPDATE_FREQUENCY = 5000; //5 seconds
     private final static byte DEFAULT_MASK = 32;
 
-    private Rover(int roverID) {
-        this.roverID = roverID;
+    private Rover() {
         routingTable = new ArrayList<>();
 
-        Thread listenerThread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                startListening();
-            }
-        });
+        Thread listenerThread =
+                new Thread(this::startListening); //starts the listener thread
         listenerThread.start();
 
         new Timer().scheduleAtFixedRate(new TimerTask() {
@@ -37,20 +30,19 @@ public class Rover extends Thread {
         }, 0, UPDATE_FREQUENCY);
     }
 
-    public static void main(String[] args) throws ArgumentException {
-        String usage = "Usage: java Rover <rover_id>";
-        int roverID;
+    public static void main(String[] args) {
+//        String usage = "Usage: java Rover <rover_id>";
+//        int roverID;
 
-        try {
-            roverID = Integer.parseInt(args[0]);
-        } catch (Exception n) {
-            throw new ArgumentException(usage); //Prevents further execution
-        }
+//        try {
+//            roverID = Integer.parseInt(args[0]);
+//        } catch (Exception n) {
+//            throw new ArgumentException(usage); //Prevents further execution
+//        }
 
-        Rover rover = new Rover(roverID);
+        new Rover();
     }
 
-    @SuppressWarnings("InfiniteLoopStatement")
     private void startListening() {
         try {
             MulticastSocket socket = new MulticastSocket(MULTICAST_PORT);
@@ -99,6 +91,7 @@ public class Rover extends Thread {
      *
      * @return the RIP packet in a byte array
      */
+    @SuppressWarnings("SameParameterValue")
     private byte[] getRIPPacket(boolean isRequest) throws UnknownHostException {
         ArrayList<Byte> arrayList = new ArrayList<>();
 
@@ -169,9 +162,10 @@ public class Rover extends Thread {
     private ArrayList<RoutingTableEntry> decodeRIPPacket(byte[] ripPacket) {
         ArrayList<RoutingTableEntry> arrayList = new ArrayList<>();
         int i = 0;
-        byte command = ripPacket[i++];
-
-        byte version = ripPacket[i++];
+        i += 2; //Ignore command and version
+//        byte command = ripPacket[i++];
+//
+//        byte version = ripPacket[i++];
 
         i += 2;
         while (i < ripPacket.length) {
@@ -303,13 +297,13 @@ public class Rover extends Thread {
 
 
     /**
-     * This is where the actualy RIP shortest distance calculation actually
+     * This is where the actual RIP shortest distance calculation actually
      * happens. This method updates the Rover's routingTable with the entries
      * from receivedTable.
      *
      * @param receivedTable A RIP table that was received by this Rover.
      */
-    private void updateRoutingTable(ArrayList<RoutingTableEntry> receivedTable){
+    private void updateRoutingTable(ArrayList<RoutingTableEntry> receivedTable) {
 
     }
 }
