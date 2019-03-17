@@ -263,26 +263,35 @@ public class Rover extends Thread {
      */
     private void addSingleRoutingEntry(InetAddress inetAddress) {
         String ipToAdd = inetAddress.getHostAddress();
-        boolean editedInTable = false;
+        boolean presentInTable = false;
+        boolean changed = false;
         for (RoutingTableEntry r : routingTable) {
             if (r.IPAddress.equals(ipToAdd)) {       //TODO No. Must support mask
-                r.nextHop = r.IPAddress;
-                r.cost = 1;
-                editedInTable = true;
-                break;
+                if (r.cost != 1) {
+                    r.nextHop = r.IPAddress;
+                    r.cost = 1;
+                    presentInTable = true;
+                    changed = true;
+                    break;
+                }
+                else presentInTable = true;
             }
         }
 
-        if (!editedInTable) {
+        if (!presentInTable) {
             RoutingTableEntry r = new RoutingTableEntry(ipToAdd, DEFAULT_MASK
                     , ipToAdd, (byte) 1);
             routingTable.add(r);
+            changed = true;
         }
-        displayRoutingTable();
+
+        if(changed) {
+            displayRoutingTable();
+        }
     }
 
     /**
-     * Displays the current state of the Routing Table
+     * Displays the current state of the Routing Table.
      */
     private void displayRoutingTable() {
         System.out.println();
