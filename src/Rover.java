@@ -11,32 +11,33 @@ public class Rover extends Thread {
 
     private final static int MULTICAST_PORT = 20001;
     private final static int UPDATE_FREQUENCY = 5000; //5 seconds
+    private final static byte DEFAULT_MASK = 32;
 
     private Rover(int roverID) {
         this.roverID = roverID;
         routingTable = new ArrayList<>();
 
-//        Thread listenerThread = new Thread(new Runnable() {
-//            @Override
-//            public void run() {
-//                startListening();
-//            }
-//        });
-//        listenerThread.start();
-//
-//        new Timer().scheduleAtFixedRate(new TimerTask() {
-//            @Override
-//            public void run() {
-//                try {
-//                    sendRIPMessage();
-//                } catch (UnknownHostException e) {
-//                    e.printStackTrace();
-//                }
-//            }
-//        }, 0, UPDATE_FREQUENCY);
+        Thread listenerThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                startListening();
+            }
+        });
+        listenerThread.start();
+
+        new Timer().scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                try {
+                    sendRIPMessage();
+                } catch (UnknownHostException e) {
+                    e.printStackTrace();
+                }
+            }
+        }, 0, UPDATE_FREQUENCY);
     }
 
-    public static void main(String[] args) throws ArgumentException, UnknownHostException {
+    public static void main(String[] args) throws ArgumentException {
         String usage = "Usage: java Rover <rover_id>";
         int roverID;
 
@@ -47,21 +48,9 @@ public class Rover extends Thread {
         }
 
         Rover rover = new Rover(roverID);
-        RoutingTableEntry r = new RoutingTableEntry("255.255.255.255",
-                (byte)24,
-                "238.238.238.238", (byte)5);
-        rover.routingTable.add(r);
-
-
-        byte[] packet = rover.getRIPPacket(false);
-        ArrayList<RoutingTableEntry> arr = rover.decodeRIPPacket(packet);
-        System.out.println("Address\tNextHop\tCost");
-
-        for (RoutingTableEntry routingTableEntry : arr){
-            System.out.println(routingTableEntry.IPAddress + "\t" + routingTableEntry.nextHop + "\t" + routingTableEntry.cost);
-        }
     }
 
+    @SuppressWarnings("InfiniteLoopStatement")
     private void startListening() {
         try {
             MulticastSocket socket = new MulticastSocket(MULTICAST_PORT);
@@ -70,24 +59,14 @@ public class Rover extends Thread {
             socket.joinGroup(iGroup);
 
             while (true) {
-
                 DatagramPacket datagramPacket = new DatagramPacket(buffer,
                         buffer.length);
                 socket.receive(datagramPacket);
-                String received = new String(
-                        datagramPacket.getData(), 0, datagramPacket.getLength());
-
-                if (received.equals("exit")) {
-                    System.out.println("Exiting...");
-                    break;
-                } else {
-                    System.out.println("Received message: " + received);
-                    System.out.println("Received from: " + datagramPacket.getAddress());
-                }
+                ArrayList<RoutingTableEntry> receivedEntries =
+                        unpackRIPEntries(datagramPacket);
+                addSingleRoutingEntry(datagramPacket.getAddress());
+                updateRoutingTable(receivedEntries);
             }
-
-            socket.leaveGroup(iGroup);
-            socket.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -186,6 +165,7 @@ public class Rover extends Thread {
      * @return An ArrayList of all possible RoutingTableEntries that can be
      * constructed out of this packet.
      */
+    @SuppressWarnings("MismatchedReadAndWriteOfArray")
     private ArrayList<RoutingTableEntry> decodeRIPPacket(byte[] ripPacket) {
         ArrayList<RoutingTableEntry> arrayList = new ArrayList<>();
         int i = 0;
@@ -195,7 +175,7 @@ public class Rover extends Thread {
 
         i += 2;
         while (i < ripPacket.length) {
-            byte AFI[] = new byte[2];
+            byte[] AFI = new byte[2];
             AFI[0] = ripPacket[i++];
             AFI[1] = ripPacket[i++];
 
@@ -257,5 +237,79 @@ public class Rover extends Thread {
         }
 
         return sb.toString();
+    }
+
+    /**
+     * Gets the RIP contents and retrieves an ArrayList of RoutingTableEntries
+     * from decodeRIPPacket().
+     *
+     * @param datagramPacket the received RIP packet from another Rover.
+     */
+    private ArrayList<RoutingTableEntry> unpackRIPEntries(DatagramPacket datagramPacket) {
+        byte[] receivedRipPacket = new byte[datagramPacket.getLength()];
+        System.arraycopy(datagramPacket.getData(), 0, receivedRipPacket, 0,
+                receivedRipPacket.length);
+        ArrayList<RoutingTableEntry> entries = decodeRIPPacket(receivedRipPacket);
+        System.out.println("Received the following Table Entries:");
+        System.out.println("Address\t\tNextHop\t\tCost");
+        for (RoutingTableEntry r : entries) {
+            System.out.println(r.IPAddress + " " + r.nextHop + " " + r.cost);
+        }
+        return entries;
+    }
+
+    /**
+     * Accepts an IP Address and adds it to the table with a hop count of 1
+     * (or updates an existing IP with mask to a hop count of 1) since this
+     * IP address is directly reachable.
+     *
+     * @param inetAddress represents an IP address that responded to a RIP
+     *                    request. Since it responded, the hop count is 1,
+     *                    and the next hop is itself.
+     */
+    private void addSingleRoutingEntry(InetAddress inetAddress) {
+        String ipToAdd = inetAddress.getHostAddress();
+        boolean editedInTable = false;
+        for (RoutingTableEntry r : routingTable) {
+            if (r.IPAddress.equals(ipToAdd)) {       //TODO No. Must support mask
+                r.nextHop = r.IPAddress;
+                r.cost = 1;
+                editedInTable = true;
+                break;
+            }
+        }
+
+        if (!editedInTable) {
+            RoutingTableEntry r = new RoutingTableEntry(ipToAdd, DEFAULT_MASK
+                    , ipToAdd, (byte) 1);
+            routingTable.add(r);
+        }
+        displayRoutingTable();
+    }
+
+    /**
+     * Displays the current state of the Routing Table
+     */
+    private void displayRoutingTable() {
+        System.out.println();
+        System.out.println("============================");
+        System.out.println("Updated Routing Table Entries");
+        System.out.println("Address\t\t\t\tNextHop\t\tCost");
+        for (RoutingTableEntry r : routingTable) {
+            System.out.println(r.IPAddress + "\t" + r.nextHop + "\t" + r.cost);
+        }
+        System.out.println();
+    }
+
+
+    /**
+     * This is where the actualy RIP shortest distance calculation actually
+     * happens. This method updates the Rover's routingTable with the entries
+     * from receivedTable.
+     *
+     * @param receivedTable A RIP table that was received by this Rover.
+     */
+    private void updateRoutingTable(ArrayList<RoutingTableEntry> receivedTable){
+
     }
 }
