@@ -321,27 +321,26 @@ public class Rover extends Thread {
                     findRoutingTableEntryForIp(ipAddress);
             if (!ipAddress.equals(selfIp)) {
                 byte cost = (byte) (r.cost + 1);
+
+                if (routingTableEntry == null) {
+                    routingTableEntry = new RoutingTableEntry(ipAddress,
+                            DEFAULT_MASK, senderIp, cost);
+                    routingTable.add(routingTableEntry);
+                    continue;
+                }
+
                 if (cost < getCost(routingTableEntry)) {
-                    r.nextHop = senderIp;
-                    r.cost = cost;
+                    routingTableEntry.nextHop = senderIp;
+                    routingTableEntry.cost = cost;
                 } else {
                     /*
                         Metric is higher than current. However, it must be
                         updated if the metric came from the router that we are
                         using as next hop.
                     */
-                    /*
-                        Note that there's no way routingTableEntry can be
-                        null at this point. If it is null, getCost() will
-                        return infinity, and the if condition above will
-                        always hold true. Thus, it will never enter this
-                        block if routingTableEntry is null.
-                        Hence, the following assertion.
-                     */
-                    assert routingTableEntry != null;
                     if (senderIp.equals(routingTableEntry.nextHop)) {
-                        r.nextHop = senderIp;
-                        r.cost = cost;
+                        routingTableEntry.nextHop = senderIp;
+                        routingTableEntry.cost = cost;
                     }
                 }
             }
