@@ -57,7 +57,7 @@ public class Rover extends Thread {
                 ArrayList<RoutingTableEntry> receivedEntries =
                         unpackRIPEntries(datagramPacket);
                 addSingleRoutingEntry(datagramPacket.getAddress());
-                updateRoutingTable(receivedEntries);
+                updateRoutingTable(receivedEntries, datagramPacket.getAddress());
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -273,8 +273,7 @@ public class Rover extends Thread {
                     presentInTable = true;
                     changed = true;
                     break;
-                }
-                else presentInTable = true;
+                } else presentInTable = true;
             }
         }
 
@@ -285,7 +284,7 @@ public class Rover extends Thread {
             changed = true;
         }
 
-        if(changed) {
+        if (changed) {
             displayRoutingTable();
         }
     }
@@ -312,7 +311,73 @@ public class Rover extends Thread {
      *
      * @param receivedTable A RIP table that was received by this Rover.
      */
-    private void updateRoutingTable(ArrayList<RoutingTableEntry> receivedTable) {
+    private void updateRoutingTable(ArrayList<RoutingTableEntry> receivedTable, InetAddress inetAddress) throws UnknownHostException {
+        String senderIp = inetAddress.getHostAddress();
+        String selfIp = InetAddress.getLocalHost().getHostAddress();
 
+        for (RoutingTableEntry r : receivedTable) {
+            String ipAddress = r.IPAddress;
+            RoutingTableEntry routingTableEntry =
+                    findRoutingTableEntryForIp(ipAddress);
+            if (!ipAddress.equals(selfIp)) {
+                byte cost = (byte) (r.cost + 1);
+                if (cost < getCost(routingTableEntry)) {
+                    r.nextHop = senderIp;
+                    r.cost = cost;
+                } else {
+                    /*
+                        Metric is higher than current. However, it must be
+                        updated if the metric came from the router that we are
+                        using as next hop.
+                    */
+                    /*
+                        Note that there's no way routingTableEntry can be
+                        null at this point. If it is null, getCost() will
+                        return infinity, and the if condition above will
+                        always hold true. Thus, it will never enter this
+                        block if routingTableEntry is null.
+                        Hence, the following assertion.
+                     */
+                    assert routingTableEntry != null;
+                    if (senderIp.equals(routingTableEntry.nextHop)) {
+                        r.nextHop = senderIp;
+                        r.cost = cost;
+                    }
+                }
+            }
+        }
     }
+
+    /**
+     * Scans the current table and returns an entry for an IP address.
+     *
+     * @param ip an IP Address in consideration by updateRoutingTable().
+     * @return if found: the matching RoutingTableEntry; else: null.
+     */
+    private RoutingTableEntry findRoutingTableEntryForIp(String ip) {
+        for (RoutingTableEntry r : routingTable) {
+            if (r.IPAddress.equals(ip)) {
+                return r;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Accepts a RoutingTableEntry and returns the corresponding cost if it
+     * is not null. Note that the routingTableEntry is an entry that has been
+     * found by findRoutingTableEntryForIp(); it represents an entry that
+     * corresponds to the ipAddress that is currently being considered by
+     * updateRoutingTable().
+     *
+     * @param routingTableEntry an entry found for an ipAddress (by
+     *                          findRoutingTableEntryForIp()
+     * @return the matching cost if not null, otherwise infinity.
+     */
+    private int getCost(RoutingTableEntry routingTableEntry) {
+        return routingTableEntry != null ? routingTableEntry.cost :
+                Integer.MAX_VALUE;
+    }
+
+
 }
