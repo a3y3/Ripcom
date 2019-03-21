@@ -1,15 +1,16 @@
 import java.io.IOException;
 import java.net.*;
-import java.util.ArrayList;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
 
 public class Rover extends Thread {
     private ArrayList<RoutingTableEntry> routingTable;
+    private HashMap<String, Timer> timers = new HashMap<>();
 
     private final static int MULTICAST_PORT = 20001;
     private final static int UPDATE_FREQUENCY = 5000; //5 seconds
     private final static byte DEFAULT_MASK = 32;
+    private final static int INFINITY = 16;
+    private final static int TIMEOUT = 10000;   // unreachable at 10 secs
 
     private Rover() {
         routingTable = new ArrayList<>();
@@ -57,6 +58,7 @@ public class Rover extends Thread {
                 ArrayList<RoutingTableEntry> receivedEntries =
                         unpackRIPEntries(datagramPacket);
                 addSingleRoutingEntry(datagramPacket.getAddress());
+                startTimerFor(datagramPacket.getAddress().getHostAddress());
                 updateRoutingTable(receivedEntries, datagramPacket.getAddress());
             }
         } catch (IOException e) {
@@ -84,6 +86,27 @@ public class Rover extends Thread {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private void startTimerFor(String ipAddress) {
+        Timer timer;
+        if (timers.containsKey(ipAddress)) {
+            timer = timers.get(ipAddress);
+            timer.cancel();
+        }
+        timer = new Timer();
+        timers.put(ipAddress, timer);
+
+        timer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                System.out.println(ipAddress + " timed out!");
+                RoutingTableEntry r = findRoutingTableEntryForIp(ipAddress);
+                r.cost = INFINITY;
+                displayRoutingTable();
+            }
+        }, TIMEOUT);
+
     }
 
     /**
@@ -244,11 +267,11 @@ public class Rover extends Thread {
         System.arraycopy(datagramPacket.getData(), 0, receivedRipPacket, 0,
                 receivedRipPacket.length);
         ArrayList<RoutingTableEntry> entries = decodeRIPPacket(receivedRipPacket);
-        System.out.println("Received the following Table Entries:");
-        System.out.println("Address\t\tNextHop\t\tCost");
-        for (RoutingTableEntry r : entries) {
-            System.out.println(r.IPAddress + " " + r.nextHop + " " + r.cost);
-        }
+//        System.out.println("Received the following Table Entries:");
+//        System.out.println("Address\t\tNextHop\t\tCost");
+//        for (RoutingTableEntry r : entries) {
+//            System.out.println(r.IPAddress + " " + r.nextHop + " " + r.cost);
+//        }
         return entries;
     }
 
@@ -261,7 +284,10 @@ public class Rover extends Thread {
      *                    request. Since it responded, the hop count is 1,
      *                    and the next hop is itself.
      */
-    private void addSingleRoutingEntry(InetAddress inetAddress) {
+    private void addSingleRoutingEntry(InetAddress inetAddress) throws UnknownHostException {
+        if (inetAddress.getHostAddress().equals(InetAddress.getLocalHost().getHostAddress())){
+            return;
+        }
         String ipToAdd = inetAddress.getHostAddress();
         boolean presentInTable = false;
         boolean changed = false;
@@ -328,7 +354,14 @@ public class Rover extends Thread {
                     routingTable.add(routingTableEntry);
                     continue;
                 }
-
+                if (r.nextHop.equals(selfIp)) {
+                    /*
+                        Split Horizon with Poisoned Reverse. Basically, if
+                        this Rover gets a packet that uses it as the next
+                        hop, treat it as infinity.
+                     */
+                    continue;       //
+                }
                 if (cost < getCost(routingTableEntry)) {
                     routingTableEntry.nextHop = senderIp;
                     routingTableEntry.cost = cost;
@@ -374,9 +407,6 @@ public class Rover extends Thread {
      * @return the matching cost if not null, otherwise infinity.
      */
     private int getCost(RoutingTableEntry routingTableEntry) {
-        return routingTableEntry != null ? routingTableEntry.cost :
-                Integer.MAX_VALUE;
+        return routingTableEntry != null ? routingTableEntry.cost : INFINITY;
     }
-
-
 }
