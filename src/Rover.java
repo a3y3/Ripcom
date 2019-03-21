@@ -15,13 +15,13 @@ public class Rover extends Thread {
     private boolean verboseOutputs;
     private int MULTICAST_PORT = 0;
     private int RIP_PORT = 0;
+    private String MULTICAST_IP;
 
     private Rover() {
         routingTable = new ArrayList<>();
     }
 
     public static void main(String[] args) {
-//        String usage = "Usage: java Rover <rover_id>";
 //        int roverID;
 
 //        try {
@@ -35,6 +35,14 @@ public class Rover extends Thread {
         rover.startThreads();
     }
 
+    /**
+     * This method creates two threads; a listener thread that listens on
+     * the multicast channel for RIP packets, and a Timer thread that calls
+     * sendRIPMessage every UPDATE_FREQUENCY intervals.
+     * <p>
+     * This method is called after parsing user arguments, ensuring that
+     * before the threads are created,
+     */
     private void startThreads() {
         Thread listenerThread =
                 new Thread(this::startListening); //starts the listener thread
@@ -52,17 +60,29 @@ public class Rover extends Thread {
         }, 0, UPDATE_FREQUENCY);
     }
 
+    /**
+     * Scans args and sets flags appropriately.
+     *
+     * @param args STDIN arguments.
+     */
     private void parseArguments(String[] args) {
         boolean missingArgument = false;
+        boolean missingMulticastIP = true;
 
         for (int i = 0; i < args.length; i++) {
             String argument = args[i];
-            if (argument.equals("-v")) verboseOutputs = true;
+            if (argument.equals("-v")) {
+                verboseOutputs = true;
+            }
             if (argument.equals("-m")) {
                 MULTICAST_PORT = Integer.parseInt(args[i + 1]);
             }
             if (argument.equals("-p")) {
                 RIP_PORT = Integer.parseInt(args[i + 1]);
+            }
+            if (argument.equals("-i")) {
+                MULTICAST_IP = args[i + 1];
+                missingMulticastIP = false;
             }
         }
         if (MULTICAST_PORT == 0) {
@@ -71,19 +91,49 @@ public class Rover extends Thread {
             missingArgument = true;
         }
         if (RIP_PORT == 0) {
-            System.out.println("Waring: Port not specified, using port " + 32768);
+            System.out.println("Warning: Port not specified, using port " + 32768);
             RIP_PORT = 32768;
             missingArgument = true;
         }
+        if (missingMulticastIP) {
+            System.out.println("Warning: Multicast IP not specified, using " +
+                    "default IP 233.33.33.33");
+            MULTICAST_IP = "233.33.33.33";
+            missingArgument = true;
+        }
         if (missingArgument)
-            System.out.println("See --help for options");   //TODO
+            System.out.println("See --help for options");
     }
 
+    /**
+     * Displays available options to start the Rover.
+     */
+    private void displayHelp(){
+        String usage = "Usage: java Rover -<flags>";
+        System.out.println(usage);
+        System.out.println("List of flags");
+        System.out.println("-v: verbose mode. In this mode, every received " +
+                "packet is displayed, and the current routing table is " +
+                "displayed at every available opportunity.");
+        System.out.println();
+        System.out.println("-p: port: This port is the source port. In RIP, " +
+                "this field is 520. You will need to run the program as root " +
+                "to set this value as 520.");
+        System.out.println();
+        System.out.println("-m: multicast port. This port is where the " +
+                "multicast messages are sent TO.");
+        System.out.println("-i: multicast IP. The IP where messages are sent " +
+                "to. Defaulted to 233.33.33.33 if not specified.");
+        System.exit(1);
+    }
+    /**
+     * Listens on the multicast ip for RIP packets.
+     */
     private void startListening() {
         try {
             MulticastSocket socket = new MulticastSocket(MULTICAST_PORT);
             byte[] buffer = new byte[256];
-            InetAddress iGroup = InetAddress.getByName("233.33.33.33");
+            InetAddress iGroup = InetAddress.getByName(MULTICAST_IP);
             socket.joinGroup(iGroup);
 
             while (true) {
@@ -106,7 +156,7 @@ public class Rover extends Thread {
         InetAddress iGroup = null;
 
         try {
-            iGroup = InetAddress.getByName("233.33.33.33");
+            iGroup = InetAddress.getByName(MULTICAST_IP);
         } catch (UnknownHostException e) {
             e.printStackTrace();
         }
@@ -267,7 +317,7 @@ public class Rover extends Thread {
     }
 
     /**
-     * Fills ipAddressp[] with the unsigned representation of the bytes from
+     * Fills ipAddress[] with the unsigned representation of the bytes from
      * the RIP Packet.
      *
      * @param ipAddress the array that needs to be filled
@@ -378,6 +428,13 @@ public class Rover extends Thread {
      * This is where the actual RIP shortest distance calculation actually
      * happens. This method updates the Rover's routingTable with the entries
      * from receivedTable.
+     * <p>
+     * The method also checks if the table was updated or not by using the
+     * variable @code{updated}. If this variable is set to true by the end of
+     * the method, the updated routing table is displayed to STDOUT. More
+     * importantly, a RIP message is also multicasted on the network to
+     * advertise the new found routes. This feature thus implements triggered
+     * updates.
      *
      * @param receivedTable A RIP table that was received by this Rover.
      */
