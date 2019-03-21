@@ -6,18 +6,36 @@ public class Rover extends Thread {
     private ArrayList<RoutingTableEntry> routingTable;
     private HashMap<String, Timer> timers = new HashMap<>();
 
-    private final static int MULTICAST_PORT = 20001;
     private final static int UPDATE_FREQUENCY = 5000; //5 seconds
     private final static byte DEFAULT_MASK = 32;
-    private final static int INFINITY = 16;
+    private final static int INFINITY = 16;     //Max hop count in RIP is 15
     private final static int TIMEOUT = 10000;   // unreachable at 10 secs
 
-    //flags
+    //flags and args
     private boolean verboseOutputs;
+    private int MULTICAST_PORT = 0;
+    private int RIP_PORT = 0;
 
     private Rover() {
         routingTable = new ArrayList<>();
+    }
 
+    public static void main(String[] args) {
+//        String usage = "Usage: java Rover <rover_id>";
+//        int roverID;
+
+//        try {
+//            roverID = Integer.parseInt(args[0]);
+//        } catch (Exception n) {
+//            throw new ArgumentException(usage); //Prevents further execution
+//        }
+
+        Rover rover = new Rover();
+        rover.parseArguments(args);
+        rover.startThreads();
+    }
+
+    private void startThreads(){
         Thread listenerThread =
                 new Thread(this::startListening); //starts the listener thread
         listenerThread.start();
@@ -33,26 +51,33 @@ public class Rover extends Thread {
             }
         }, 0, UPDATE_FREQUENCY);
     }
+    private void parseArguments(String[] args) {
+        boolean missingArgument = false;
 
-    public static void main(String[] args) {
-//        String usage = "Usage: java Rover <rover_id>";
-//        int roverID;
-
-//        try {
-//            roverID = Integer.parseInt(args[0]);
-//        } catch (Exception n) {
-//            throw new ArgumentException(usage); //Prevents further execution
-//        }
-
-        Rover rover = new Rover();
-        rover.parseArguments(args);
-    }
-
-    private void parseArguments(String[] args){
-        for (String argument: args){
+        for (int i = 0; i < args.length; i++) {
+            String argument = args[i];
             if (argument.equals("-v")) verboseOutputs = true;
+            if (argument.equals("-m")) {
+                MULTICAST_PORT = Integer.parseInt(args[i + 1]);
+            }
+            if (argument.equals("-p")) {
+                RIP_PORT = Integer.parseInt(args[i + 1]);
+            }
         }
+        if (MULTICAST_PORT == 0) {
+            System.out.println("Warning: Assuming Multicast port " + 20001);
+            MULTICAST_PORT = 20001;
+            missingArgument = true;
+        }
+        if (RIP_PORT == 0) {
+            System.out.println("Waring: Port not specified, using port " + 32768);
+            RIP_PORT = 32768;
+            missingArgument = true;
+        }
+        if (missingArgument)
+            System.out.println("See --help for options");   //TODO
     }
+
     private void startListening() {
         try {
             MulticastSocket socket = new MulticastSocket(MULTICAST_PORT);
@@ -89,7 +114,7 @@ public class Rover extends Thread {
 
         DatagramSocket datagramSocket;
         try {
-            datagramSocket = new DatagramSocket();
+            datagramSocket = new DatagramSocket(RIP_PORT);
             datagramSocket.send(datagramPacket);
             datagramSocket.close();
         } catch (IOException e) {
@@ -114,7 +139,7 @@ public class Rover extends Thread {
                 r.cost = INFINITY;
                 ArrayList<RoutingTableEntry> arrayList =
                         getEntriesUsingIp(ipAddress);
-                for (RoutingTableEntry routingTableEntry: arrayList){
+                for (RoutingTableEntry routingTableEntry : arrayList) {
                     routingTableEntry.cost = INFINITY;
                 }
                 displayRoutingTable();
