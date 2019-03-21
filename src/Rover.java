@@ -12,6 +12,9 @@ public class Rover extends Thread {
     private final static int INFINITY = 16;
     private final static int TIMEOUT = 10000;   // unreachable at 10 secs
 
+    //flags
+    private boolean verboseOutputs;
+
     private Rover() {
         routingTable = new ArrayList<>();
 
@@ -41,9 +44,15 @@ public class Rover extends Thread {
 //            throw new ArgumentException(usage); //Prevents further execution
 //        }
 
-        new Rover();
+        Rover rover = new Rover();
+        rover.parseArguments(args);
     }
 
+    private void parseArguments(String[] args){
+        for (String argument: args){
+            if (argument.equals("-v")) verboseOutputs = true;
+        }
+    }
     private void startListening() {
         try {
             MulticastSocket socket = new MulticastSocket(MULTICAST_PORT);
@@ -103,6 +112,11 @@ public class Rover extends Thread {
                 System.out.println(ipAddress + " timed out!");
                 RoutingTableEntry r = findRoutingTableEntryForIp(ipAddress);
                 r.cost = INFINITY;
+                ArrayList<RoutingTableEntry> arrayList =
+                        getEntriesUsingIp(ipAddress);
+                for (RoutingTableEntry routingTableEntry: arrayList){
+                    routingTableEntry.cost = INFINITY;
+                }
                 displayRoutingTable();
             }
         }, TIMEOUT);
@@ -267,11 +281,15 @@ public class Rover extends Thread {
         System.arraycopy(datagramPacket.getData(), 0, receivedRipPacket, 0,
                 receivedRipPacket.length);
         ArrayList<RoutingTableEntry> entries = decodeRIPPacket(receivedRipPacket);
-        System.out.println("Received the following Table Entries from " + datagramPacket.getAddress().getHostAddress());
-        System.out.println("Address\t\tNextHop\t\tCost");
-        for (RoutingTableEntry r : entries) {
-            System.out.println(r.IPAddress + " " + r.nextHop + " " + r.cost);
+
+        if (verboseOutputs) {
+            System.out.println("Received the following Table Entries from " + datagramPacket.getAddress().getHostAddress());
+            System.out.println("Address\t\tNextHop\t\tCost");
+            for (RoutingTableEntry r : entries) {
+                System.out.println(r.IPAddress + "\t" + r.nextHop + "\t" + r.cost);
+            }
         }
+
         return entries;
     }
 
@@ -293,13 +311,13 @@ public class Rover extends Thread {
         boolean changed = false;
         for (RoutingTableEntry routingTableEntry : routingTable) {
             if (routingTableEntry.IPAddress.equals(ipToAdd)) {       //TODO No. Must support mask
+                presentInTable = true;
                 if (routingTableEntry.cost != 1) {
                     routingTableEntry.nextHop = routingTableEntry.IPAddress;
                     routingTableEntry.cost = 1;
-                    presentInTable = true;
                     changed = true;
                     break;
-                } else presentInTable = true;
+                }
             }
         }
 
@@ -322,7 +340,7 @@ public class Rover extends Thread {
         System.out.println();
         System.out.println("============================");
         System.out.println("Updated Routing Table Entries");
-        System.out.println("Address\t\t\t\tNextHop\t\tCost");
+        System.out.println("Address\t\tNextHop\t\tCost");
         for (RoutingTableEntry r : routingTable) {
             System.out.println(r.IPAddress + "\t" + r.nextHop + "\t" + r.cost);
         }
@@ -340,6 +358,7 @@ public class Rover extends Thread {
     private void updateRoutingTable(ArrayList<RoutingTableEntry> receivedTable, InetAddress inetAddress) throws UnknownHostException {
         String senderIp = inetAddress.getHostAddress();
         String selfIp = InetAddress.getLocalHost().getHostAddress();
+        boolean updated = false;
 
         for (RoutingTableEntry r : receivedTable) {
             String ipAddress = r.IPAddress;
@@ -352,6 +371,7 @@ public class Rover extends Thread {
                     routingTableEntry = new RoutingTableEntry(ipAddress,
                             DEFAULT_MASK, senderIp, cost);
                     routingTable.add(routingTableEntry);
+                    updated = true;
                     continue;
                 }
                 if (r.nextHop.equals(selfIp)) {
@@ -360,24 +380,32 @@ public class Rover extends Thread {
                         this Rover gets a packet that uses it as the next
                         hop, treat it as infinity.
                      */
-                    continue;       //
+                    continue;
                 }
                 if (cost < getCost(routingTableEntry)) {
                     routingTableEntry.nextHop = senderIp;
                     routingTableEntry.cost = cost;
+                    updated = true;
                 } else {
                     /*
                         Metric is higher than current. However, it must be
                         updated if the metric came from the router that we are
                         using as next hop.
+                        The inner if condition is simply there for the
+                        updated variable, which is set if the earlier cost
+                        was different from the newer cost.
                     */
                     if (senderIp.equals(routingTableEntry.nextHop)) {
-                        routingTableEntry.nextHop = senderIp;
-                        routingTableEntry.cost = cost;
+                        if (routingTableEntry.cost != cost) {
+                            routingTableEntry.cost = cost;
+                            updated = true;
+                        }
                     }
                 }
             }
         }
+
+        if (verboseOutputs || updated) displayRoutingTable();
     }
 
     /**
@@ -393,6 +421,22 @@ public class Rover extends Thread {
             }
         }
         return null;
+    }
+
+    /**
+     * Finds a list of IPs that use this IP for their next hop.
+     *
+     * @param ip An IP address that needs to be searched for in nextHop
+     * @return the list of IPs that use @param ip for next hop.
+     */
+    private ArrayList<RoutingTableEntry> getEntriesUsingIp(String ip) {
+        ArrayList<RoutingTableEntry> arrayList = new ArrayList<>();
+        for (RoutingTableEntry routingTableEntry : routingTable) {
+            if (routingTableEntry.nextHop.equals(ip)) {
+                arrayList.add(routingTableEntry);
+            }
+        }
+        return arrayList;
     }
 
     /**
