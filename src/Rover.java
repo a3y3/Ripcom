@@ -267,11 +267,11 @@ public class Rover extends Thread {
         System.arraycopy(datagramPacket.getData(), 0, receivedRipPacket, 0,
                 receivedRipPacket.length);
         ArrayList<RoutingTableEntry> entries = decodeRIPPacket(receivedRipPacket);
-//        System.out.println("Received the following Table Entries:");
-//        System.out.println("Address\t\tNextHop\t\tCost");
-//        for (RoutingTableEntry r : entries) {
-//            System.out.println(r.IPAddress + " " + r.nextHop + " " + r.cost);
-//        }
+        System.out.println("Received the following Table Entries from " + datagramPacket.getAddress().getHostAddress());
+        System.out.println("Address\t\tNextHop\t\tCost");
+        for (RoutingTableEntry r : entries) {
+            System.out.println(r.IPAddress + " " + r.nextHop + " " + r.cost);
+        }
         return entries;
     }
 
@@ -285,17 +285,17 @@ public class Rover extends Thread {
      *                    and the next hop is itself.
      */
     private void addSingleRoutingEntry(InetAddress inetAddress) throws UnknownHostException {
-        if (inetAddress.getHostAddress().equals(InetAddress.getLocalHost().getHostAddress())){
+        if (inetAddress.getHostAddress().equals(InetAddress.getLocalHost().getHostAddress())) {
             return;
         }
         String ipToAdd = inetAddress.getHostAddress();
         boolean presentInTable = false;
         boolean changed = false;
-        for (RoutingTableEntry r : routingTable) {
-            if (r.IPAddress.equals(ipToAdd)) {       //TODO No. Must support mask
-                if (r.cost != 1) {
-                    r.nextHop = r.IPAddress;
-                    r.cost = 1;
+        for (RoutingTableEntry routingTableEntry : routingTable) {
+            if (routingTableEntry.IPAddress.equals(ipToAdd)) {       //TODO No. Must support mask
+                if (routingTableEntry.cost != 1) {
+                    routingTableEntry.nextHop = routingTableEntry.IPAddress;
+                    routingTableEntry.cost = 1;
                     presentInTable = true;
                     changed = true;
                     break;
