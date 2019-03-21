@@ -35,7 +35,7 @@ public class Rover extends Thread {
         rover.startThreads();
     }
 
-    private void startThreads(){
+    private void startThreads() {
         Thread listenerThread =
                 new Thread(this::startListening); //starts the listener thread
         listenerThread.start();
@@ -51,6 +51,7 @@ public class Rover extends Thread {
             }
         }, 0, UPDATE_FREQUENCY);
     }
+
     private void parseArguments(String[] args) {
         boolean missingArgument = false;
 
@@ -364,7 +365,7 @@ public class Rover extends Thread {
     private void displayRoutingTable() {
         System.out.println();
         System.out.println("============================");
-        System.out.println("Updated Routing Table Entries");
+        System.out.println("Routing Table Entries");
         System.out.println("Address\t\tNextHop\t\tCost");
         for (RoutingTableEntry r : routingTable) {
             System.out.println(r.IPAddress + "\t" + r.nextHop + "\t" + r.cost);
@@ -431,6 +432,8 @@ public class Rover extends Thread {
         }
 
         if (verboseOutputs || updated) displayRoutingTable();
+        if (updated)
+            sendRIPMessage();       //Triggered Updates for fast recovery
     }
 
     /**
