@@ -10,25 +10,36 @@ public class Rover extends Thread {
     private final static byte DEFAULT_MASK = 32;
     private final static int INFINITY = 16;     //Max hop count in RIP is 15
     private final static int TIMEOUT = 10000;   // unreachable at 10 secs
+    private final String selfIP;
 
     //flags and args
     private boolean verboseOutputs;
     private int MULTICAST_PORT = 0;
     private int RIP_PORT = 0;
     private String MULTICAST_IP;
+    private int roverID;
 
-    private Rover() {
+    private Rover() throws SocketException, UnknownHostException {
         routingTable = new ArrayList<>();
+        selfIP = getSelfIP();
     }
 
-    public static void main(String[] args) {
-//        int roverID;
+    /**
+     * Connects to Google and returns the System's IP address
+     *
+     * @return System IP Address
+     *
+     * @throws SocketException if datagramSocket failed to initialize
+     * @throws UnknownHostException if Google was not found or the computer
+     * was not connected to the internet.
+     */
+    private String getSelfIP() throws SocketException, UnknownHostException {
+        DatagramSocket datagramSocket = new DatagramSocket();
+        datagramSocket.connect(InetAddress.getByName("8.8.8.8"), 25252);
+        return datagramSocket.getLocalAddress().getHostAddress();
+    }
 
-//        try {
-//            roverID = Integer.parseInt(args[0]);
-//        } catch (Exception n) {
-//            throw new ArgumentException(usage); //Prevents further execution
-//        }
+    public static void main(String[] args) throws ArgumentException, SocketException, UnknownHostException {
 
         Rover rover = new Rover();
         rover.parseArguments(args);
@@ -65,28 +76,42 @@ public class Rover extends Thread {
      *
      * @param args STDIN arguments.
      */
-    private void parseArguments(String[] args) {
+    private void parseArguments(String[] args) throws ArgumentException {
         boolean missingArgument = false;
         boolean missingMulticastIP = true;
+        boolean missingRoverID = true;
 
-        for (int i = 0; i < args.length; i++) {
-            String argument = args[i];
-            if (argument.equals("-h") || argument.equals("--help")){
-                displayHelp();
+        try {
+            for (int i = 0; i < args.length; i++) {
+                String argument = args[i];
+                if (argument.equals("-h") || argument.equals("--help")) {
+                    displayHelp();
+                }
+                if (argument.equals("-v") || argument.equals("--verbose")) {
+                    verboseOutputs = true;
+                }
+                if (argument.equals("-m") || argument.equals("--multicast-port")) {
+                    MULTICAST_PORT = Integer.parseInt(args[i + 1]);
+                }
+                if (argument.equals("-p") || argument.equals("--port")) {
+                    RIP_PORT = Integer.parseInt(args[i + 1]);
+                }
+                if (argument.equals("-i") || argument.equals("--ip")) {
+                    MULTICAST_IP = args[i + 1];
+                    missingMulticastIP = false;
+                }
+                if (argument.equals("-r") || argument.equals("--rover-id")) {
+                    roverID = Integer.parseInt(args[i + 1]);
+                    missingRoverID = false;
+                }
             }
-            if (argument.equals("-v") || argument.equals("--verbose")) {
-                verboseOutputs = true;
-            }
-            if (argument.equals("-m") || argument.equals("--multicast-port")) {
-                MULTICAST_PORT = Integer.parseInt(args[i + 1]);
-            }
-            if (argument.equals("-p") || argument.equals("--port")) {
-                RIP_PORT = Integer.parseInt(args[i + 1]);
-            }
-            if (argument.equals("-i") || argument.equals("--ip")) {
-                MULTICAST_IP = args[i + 1];
-                missingMulticastIP = false;
-            }
+        } catch (Exception e) {
+            throw new ArgumentException("Your arguments are incorrect. Please" +
+                    " see --help for help and usage.");
+        }
+        if (missingRoverID) {
+            System.err.println("Error: Missing Rover ID. Exiting...");
+            displayHelp();
         }
         if (MULTICAST_PORT == 0) {
             System.out.println("Warning: Assuming Multicast port " + 20001);
@@ -111,21 +136,22 @@ public class Rover extends Thread {
     /**
      * Displays available options to start the Rover.
      */
-    private void displayHelp(){
+    private void displayHelp() {
         System.out.println();
-        String usage = "Usage: java Rover [-v | --verbose] | " +
+        String usage = "Usage: java Rover [-r | --rover-id] VALUE | " +
                 "[-p | --port] VALUE | " +
-                "[-m | --multicast-port] | " +
-                "[-i | --ip]";
+                "[-m | --multicast-port] VALUE | " +
+                "[-i | --ip] VALUE | " +
+                "[-v | --verbose]";
         System.out.println(usage);
         System.out.println();
 
 
         System.out.println("List of flags");
 
-        System.out.println("-v: verbose mode. In this mode, every received " +
-                "packet is displayed, and the current routing table is " +
-                "displayed at every available opportunity.");
+        System.out.println("-r: Rover ID: This value should serve as an 8 bit" +
+                " identifier to each Rover. This is the only field that is " +
+                "not optional.");
         System.out.println();
 
         System.out.println("-p: port: This port is the source port. In RIP, " +
@@ -141,8 +167,14 @@ public class Rover extends Thread {
                 "to. Defaulted to 233.33.33.33 if not specified.");
         System.out.println();
 
+        System.out.println("-v: verbose mode. In this mode, every received " +
+                "packet is displayed, and the current routing table is " +
+                "displayed at every available opportunity.");
+        System.out.println();
+
         System.exit(1);
     }
+
     /**
      * Listens on the multicast ip for RIP packets.
      */
@@ -168,6 +200,14 @@ public class Rover extends Thread {
         }
     }
 
+    /**
+     * Called by a Timer thread every @code{UPDATE_INTERVAL} seconds. This
+     * method calls getRIPPacket(), and sends the RIP Packet on the multicast
+     * network.
+     *
+     * @throws UnknownHostException if a connection cannot be made by the
+     * datagram packet.
+     */
     private void sendRIPMessage() throws UnknownHostException {
         byte[] buffer = getRIPPacket(true);
         InetAddress iGroup = null;
@@ -190,6 +230,21 @@ public class Rover extends Thread {
         }
     }
 
+    /**
+     * Maintains a HashMap of timers.
+     *
+     * When this function is called, it first searches if the timer for the
+     * given IP exists. If it does, it is cancelled, initialized to a new
+     * Timer, and started for @code{TIMEOUT} seconds.
+     *
+     * If any timer reaches @code{TIMEOUT} successfully, it means that a
+     * Rover timed out. The function then sets the distance of that Rover to
+     * INFINITY.
+     *
+     * @param ipAddress an IP Address of a Rover that sent this Rover a RIP
+     *                  packet directly. Hence, that Rover is the neighbour
+     *                  of this Rover, and a timer must be maintained for it.
+     */
     private void startTimerFor(String ipAddress) {
         Timer timer;
         if (timers.containsKey(ipAddress)) {
