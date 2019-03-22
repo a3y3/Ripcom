@@ -71,16 +71,19 @@ public class Rover extends Thread {
 
         for (int i = 0; i < args.length; i++) {
             String argument = args[i];
-            if (argument.equals("-v")) {
+            if (argument.equals("-h") || argument.equals("--help")){
+                displayHelp();
+            }
+            if (argument.equals("-v") || argument.equals("--verbose")) {
                 verboseOutputs = true;
             }
-            if (argument.equals("-m")) {
+            if (argument.equals("-m") || argument.equals("--multicast-port")) {
                 MULTICAST_PORT = Integer.parseInt(args[i + 1]);
             }
-            if (argument.equals("-p")) {
+            if (argument.equals("-p") || argument.equals("--port")) {
                 RIP_PORT = Integer.parseInt(args[i + 1]);
             }
-            if (argument.equals("-i")) {
+            if (argument.equals("-i") || argument.equals("--ip")) {
                 MULTICAST_IP = args[i + 1];
                 missingMulticastIP = false;
             }
@@ -109,21 +112,35 @@ public class Rover extends Thread {
      * Displays available options to start the Rover.
      */
     private void displayHelp(){
-        String usage = "Usage: java Rover -<flags>";
+        System.out.println();
+        String usage = "Usage: java Rover [-v | --verbose] | " +
+                "[-p | --port] VALUE | " +
+                "[-m | --multicast-port] | " +
+                "[-i | --ip]";
         System.out.println(usage);
+        System.out.println();
+
+
         System.out.println("List of flags");
+
         System.out.println("-v: verbose mode. In this mode, every received " +
                 "packet is displayed, and the current routing table is " +
                 "displayed at every available opportunity.");
         System.out.println();
+
         System.out.println("-p: port: This port is the source port. In RIP, " +
                 "this field is 520. You will need to run the program as root " +
                 "to set this value as 520.");
         System.out.println();
+
         System.out.println("-m: multicast port. This port is where the " +
                 "multicast messages are sent TO.");
+        System.out.println();
+
         System.out.println("-i: multicast IP. The IP where messages are sent " +
                 "to. Defaulted to 233.33.33.33 if not specified.");
+        System.out.println();
+
         System.exit(1);
     }
     /**
