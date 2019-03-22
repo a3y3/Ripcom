@@ -22,6 +22,7 @@ public class Rover extends Thread {
     private Rover() throws SocketException, UnknownHostException {
         routingTable = new ArrayList<>();
         selfIP = getSelfIP();
+        System.out.println("Initialized self IP with " + selfIP);
     }
 
     /**
@@ -50,9 +51,10 @@ public class Rover extends Thread {
      * This method creates two threads; a listener thread that listens on
      * the multicast channel for RIP packets, and a Timer thread that calls
      * sendRIPMessage every UPDATE_FREQUENCY intervals.
-     * <p>
+     *
      * This method is called after parsing user arguments, ensuring that
-     * before the threads are created,
+     * before the threads are created, the variables are set according to the
+     * flags.
      */
     private void startThreads() {
         Thread listenerThread =
@@ -451,7 +453,7 @@ public class Rover extends Thread {
      *                    and the next hop is itself.
      */
     private void addSingleRoutingEntry(InetAddress inetAddress) throws UnknownHostException {
-        if (inetAddress.getHostAddress().equals(InetAddress.getLocalHost().getHostAddress())) {
+        if (inetAddress.getHostAddress().equals(selfIP)){
             return;
         }
         String ipToAdd = inetAddress.getHostAddress();
@@ -512,14 +514,13 @@ public class Rover extends Thread {
      */
     private void updateRoutingTable(ArrayList<RoutingTableEntry> receivedTable, InetAddress inetAddress) throws UnknownHostException {
         String senderIp = inetAddress.getHostAddress();
-        String selfIp = InetAddress.getLocalHost().getHostAddress();
         boolean updated = false;
 
         for (RoutingTableEntry r : receivedTable) {
             String ipAddress = r.IPAddress;
             RoutingTableEntry routingTableEntry =
                     findRoutingTableEntryForIp(ipAddress);
-            if (!ipAddress.equals(selfIp)) {
+            if (!ipAddress.equals(selfIP)) {
                 byte cost = (byte) (r.cost + 1);
 
                 if (routingTableEntry == null) {
@@ -529,7 +530,7 @@ public class Rover extends Thread {
                     updated = true;
                     continue;
                 }
-                if (r.nextHop.equals(selfIp)) {
+                if (r.nextHop.equals(selfIP)) {
                     /*
                         Split Horizon with Poisoned Reverse. Basically, if
                         this Rover gets a packet that uses it as the next
