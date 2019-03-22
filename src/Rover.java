@@ -7,7 +7,7 @@ public class Rover extends Thread {
     private HashMap<String, Timer> timers = new HashMap<>();
 
     private final static int UPDATE_FREQUENCY = 5000; //5 seconds
-    private final static byte DEFAULT_MASK = 32;
+    private final static byte DEFAULT_MASK = 24;
     private final static int INFINITY = 16;     //Max hop count in RIP is 15
     private final static int TIMEOUT = 10000;   // unreachable at 10 secs
     private final String selfIP;
@@ -278,7 +278,6 @@ public class Rover extends Thread {
      *
      * @return the RIP packet in a byte array
      */
-    @SuppressWarnings("SameParameterValue")
     private byte[] getRIPPacket(boolean isRequest) throws UnknownHostException {
         ArrayList<Byte> arrayList = new ArrayList<>();
 
