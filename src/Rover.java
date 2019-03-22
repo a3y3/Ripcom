@@ -302,6 +302,11 @@ public class Rover extends Thread {
                     routingTableEntry.cost = INFINITY;
                 }
                 displayRoutingTable();
+                try {
+                    sendRIPMessage();       //Triggered updates
+                } catch (UnknownHostException e) {
+                    e.printStackTrace();
+                }
             }
         }, TIMEOUT);
 
@@ -573,9 +578,11 @@ public class Rover extends Thread {
             int roverID = Integer.parseInt(ipAddress.split("\\.")[2]);
             RoutingTableEntry routingTableEntry =
                     findRoutingTableEntryForIp(ipAddress);
-//            if (!ipAddress.equals(selfIP)) {
             if (roverID != this.roverID) {
                 byte cost = (byte) (r.cost + 1);
+                if (cost > INFINITY){
+                    cost  = INFINITY;
+                }
 
                 if (routingTableEntry == null) {
                     String localIP = generateRoverIpUsingID(roverID);
@@ -613,9 +620,6 @@ public class Rover extends Thread {
                         }
                     }
                 }
-            }
-            if (r.cost > INFINITY) {
-                r.cost = INFINITY;
             }
         }
 
