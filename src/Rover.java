@@ -2,10 +2,23 @@ import java.io.IOException;
 import java.net.*;
 import java.util.*;
 
+/**
+ * Represents a single Rover. To run this, see java Rover --help.
+ * <p>
+ * A Rover has a roverID associated with it, which is used to build the
+ * Rover's local IP address. This IP will be of the form "10.0.<roverID>.0/24".
+ * <p>
+ * As these Rovers move around (this can be simulated using firewalls), they
+ * will calculate the shortest distance between them using RIP v2. Each time
+ * the distance changes, the routing table is displayed.
+ *
+ * @author Soham Dongargaonkar
+ */
 public class Rover extends Thread {
     private ArrayList<RoutingTableEntry> routingTable;
     private HashMap<String, Timer> timers = new HashMap<>();
 
+    //final variables
     private final static int UPDATE_FREQUENCY = 5000; //5 seconds
     private final static byte DEFAULT_MASK = 24;
     private final static int INFINITY = 16;     //Max hop count in RIP is 15
@@ -19,6 +32,16 @@ public class Rover extends Thread {
     private String MULTICAST_IP;
     private int roverID;
 
+    /**
+     * This constructor retrieves the IP address of this Rover using a socket
+     * that connects to 8.8.8.8 (Rovers can't connect to Google on Mars, but
+     * this is a simulation after all). Hence, make sure you have an internet
+     * connection up and running before using this.
+     *
+     * @throws SocketException      see {@code getSelfIp()}
+     * @throws UnknownHostException if internet connection fails, see {@code
+     *                              getSelfIp()}
+     */
     private Rover() throws SocketException, UnknownHostException {
         routingTable = new ArrayList<>();
         selfIP = getSelfIP();
@@ -39,8 +62,15 @@ public class Rover extends Thread {
         return datagramSocket.getLocalAddress().getHostAddress();
     }
 
+    /**
+     * Starts a new Rover, and initialises threads.
+     *
+     * @param args STDIN. Passed to {@code parseArguments()}
+     * @throws ArgumentException    if arguments were passed incorrectly.
+     * @throws SocketException      see constructor
+     * @throws UnknownHostException see constructor
+     */
     public static void main(String[] args) throws ArgumentException, SocketException, UnknownHostException {
-
         Rover rover = new Rover();
         rover.parseArguments(args);
         rover.startThreads();
@@ -206,7 +236,7 @@ public class Rover extends Thread {
     }
 
     /**
-     * Called by a Timer thread every @code{UPDATE_INTERVAL} seconds. This
+     * Called by a Timer thread every {@code UPDATE_INTERVAL} seconds. This
      * method calls getRIPPacket(), and sends the RIP Packet on the multicast
      * network.
      *
@@ -240,9 +270,9 @@ public class Rover extends Thread {
      * <p>
      * When this function is called, it first searches if the timer for the
      * given IP exists. If it does, it is cancelled, initialized to a new
-     * Timer, and started for @code{TIMEOUT} seconds.
+     * Timer, and started for {@code TIMEOUT} seconds.
      * <p>
-     * If any timer reaches @code{TIMEOUT} successfully, it means that a
+     * If any timer reaches {@code TIMEOUT} successfully, it means that a
      * Rover timed out. The function then sets the distance of that Rover to
      * INFINITY.
      *
@@ -466,15 +496,13 @@ public class Rover extends Thread {
         if (receivedRoverId == roverID) {
             return;
         }
-//        if (inetAddress.getHostAddress().equals(selfIP)){
-//            return;
-//        }
+
         String ipToAdd = generateRoverIpUsingID(receivedRoverId);
         String nextHop = inetAddress.getHostAddress();
         boolean presentInTable = false;
         boolean changed = false;
         for (RoutingTableEntry routingTableEntry : routingTable) {
-            if (routingTableEntry.IPAddress.equals(ipToAdd)) {       //TODO No. Must support mask
+            if (routingTableEntry.IPAddress.equals(ipToAdd)) {
                 presentInTable = true;
                 if (routingTableEntry.cost != 1) {
                     routingTableEntry.nextHop = nextHop;
@@ -497,6 +525,12 @@ public class Rover extends Thread {
         }
     }
 
+    /**
+     * Generates an IP address of the form "10.0.{@code roverID}.0"
+     *
+     * @param roverID the id of this rover.
+     * @return the generated IP
+     */
     private String generateRoverIpUsingID(int roverID) {
         return "10.0." + roverID + ".0";
     }
@@ -522,7 +556,7 @@ public class Rover extends Thread {
      * from receivedTable.
      * <p>
      * The method also checks if the table was updated or not by using the
-     * variable @code{updated}. If this variable is set to true by the end of
+     * variable {@code updated}. If this variable is set to true by the end of
      * the method, the updated routing table is displayed to STDOUT. More
      * importantly, a RIP message is also multicasted on the network to
      * advertise the new found routes. This feature thus implements triggered
@@ -580,12 +614,14 @@ public class Rover extends Thread {
                     }
                 }
             }
-            if (r.cost > INFINITY){
+            if (r.cost > INFINITY) {
                 r.cost = INFINITY;
             }
         }
 
-        if (verboseOutputs || updated) displayRoutingTable();
+        if (verboseOutputs || updated) {
+            displayRoutingTable();
+        }
         if (updated)
             sendRIPMessage();       //Triggered Updates for fast recovery
     }

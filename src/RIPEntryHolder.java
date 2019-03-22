@@ -1,5 +1,11 @@
 import java.util.ArrayList;
 
+/**
+ * The purpose of this class is to hold an entry for an
+ * {@code ArrayList<RoutingTableEntry>} and a rover ID. This is used to
+ * "return" 2 values from a function, specifically {@code Rover
+ * .unpackRIPEntries} and {@code }
+ */
 class RIPEntryHolder {
     private ArrayList<RoutingTableEntry> arrayList;
     private int roverID;
