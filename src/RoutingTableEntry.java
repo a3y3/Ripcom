@@ -1,3 +1,8 @@
+/**
+* Holds an entry in the Routing Table of each Rover.
+*
+* @author Soham Dongargaonkar
+*/
 class RoutingTableEntry {
     String IPAddress;
     byte mask;

@@ -5,6 +5,8 @@ import java.util.ArrayList;
  * {@code ArrayList<RoutingTableEntry>} and a rover ID. This is used to
  * "return" 2 values from a function, specifically {@code Rover
  * .unpackRIPEntries} and {@code }
+ *
+ * @author Soham Dongargaonkar
  */
 class RIPEntryHolder {
     private ArrayList<RoutingTableEntry> arrayList;
