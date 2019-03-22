@@ -29,10 +29,9 @@ public class Rover extends Thread {
      * Connects to Google and returns the System's IP address
      *
      * @return System IP Address
-     *
-     * @throws SocketException if datagramSocket failed to initialize
+     * @throws SocketException      if datagramSocket failed to initialize
      * @throws UnknownHostException if Google was not found or the computer
-     * was not connected to the internet.
+     *                              was not connected to the internet.
      */
     private String getSelfIP() throws SocketException, UnknownHostException {
         DatagramSocket datagramSocket = new DatagramSocket();
@@ -51,7 +50,7 @@ public class Rover extends Thread {
      * This method creates two threads; a listener thread that listens on
      * the multicast channel for RIP packets, and a Timer thread that calls
      * sendRIPMessage every UPDATE_FREQUENCY intervals.
-     *
+     * <p>
      * This method is called after parsing user arguments, ensuring that
      * before the threads are created, the variables are set according to the
      * flags.
@@ -191,10 +190,14 @@ public class Rover extends Thread {
                 DatagramPacket datagramPacket = new DatagramPacket(buffer,
                         buffer.length);
                 socket.receive(datagramPacket);
+                RIPEntryHolder ripEntryHolder = unpackRIPEntries(datagramPacket);
+                int receivedRoverID = ripEntryHolder.getRoverID();
                 ArrayList<RoutingTableEntry> receivedEntries =
-                        unpackRIPEntries(datagramPacket);
-                addSingleRoutingEntry(datagramPacket.getAddress());
-                startTimerFor(datagramPacket.getAddress().getHostAddress());
+                        ripEntryHolder.getArrayList();
+                addSingleRoutingEntry(receivedRoverID,
+                        datagramPacket.getAddress());
+                startTimerFor(datagramPacket.getAddress().getHostAddress(),
+                        receivedRoverID);
                 updateRoutingTable(receivedEntries, datagramPacket.getAddress());
             }
         } catch (IOException e) {
@@ -208,7 +211,7 @@ public class Rover extends Thread {
      * network.
      *
      * @throws UnknownHostException if a connection cannot be made by the
-     * datagram packet.
+     *                              datagram packet.
      */
     private void sendRIPMessage() throws UnknownHostException {
         byte[] buffer = getRIPPacket(true);
@@ -234,11 +237,11 @@ public class Rover extends Thread {
 
     /**
      * Maintains a HashMap of timers.
-     *
+     * <p>
      * When this function is called, it first searches if the timer for the
      * given IP exists. If it does, it is cancelled, initialized to a new
      * Timer, and started for @code{TIMEOUT} seconds.
-     *
+     * <p>
      * If any timer reaches @code{TIMEOUT} successfully, it means that a
      * Rover timed out. The function then sets the distance of that Rover to
      * INFINITY.
@@ -247,7 +250,7 @@ public class Rover extends Thread {
      *                  packet directly. Hence, that Rover is the neighbour
      *                  of this Rover, and a timer must be maintained for it.
      */
-    private void startTimerFor(String ipAddress) {
+    private void startTimerFor(String ipAddress, int roverID) {
         Timer timer;
         if (timers.containsKey(ipAddress)) {
             timer = timers.get(ipAddress);
@@ -255,12 +258,13 @@ public class Rover extends Thread {
         }
         timer = new Timer();
         timers.put(ipAddress, timer);
+        String localIP = generateRoverIpUsingID(roverID);
 
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
-                System.out.println(ipAddress + " timed out!");
-                RoutingTableEntry r = findRoutingTableEntryForIp(ipAddress);
+                System.out.println(localIP + " timed out!");
+                RoutingTableEntry r = findRoutingTableEntryForIp(localIP);
                 r.cost = INFINITY;
                 ArrayList<RoutingTableEntry> arrayList =
                         getEntriesUsingIp(ipAddress);
@@ -289,8 +293,12 @@ public class Rover extends Thread {
         byte version = 2;
         arrayList.add(version);     // Version
 
+        /*
+            The next field is supposed to be unused zeros, but this program
+            modifies the RIP packet by including the rover ID here.
+         */
         arrayList.add(zero);
-        arrayList.add(zero);     // Unused zeros
+        arrayList.add((byte) roverID);
 
         for (RoutingTableEntry r : routingTable) {
             arrayList.add(zero);
@@ -345,7 +353,7 @@ public class Rover extends Thread {
      * constructed out of this packet.
      */
     @SuppressWarnings("MismatchedReadAndWriteOfArray")
-    private ArrayList<RoutingTableEntry> decodeRIPPacket(byte[] ripPacket) {
+    private RIPEntryHolder decodeRIPPacket(byte[] ripPacket) {
         ArrayList<RoutingTableEntry> arrayList = new ArrayList<>();
         int i = 0;
         i += 2; //Ignore command and version
@@ -353,7 +361,8 @@ public class Rover extends Thread {
 //
 //        byte version = ripPacket[i++];
 
-        i += 2;
+        i++;
+        int roverID = ripPacket[i++];
         while (i < ripPacket.length) {
             byte[] AFI = new byte[2];
             AFI[0] = ripPacket[i++];
@@ -386,7 +395,7 @@ public class Rover extends Thread {
             arrayList.add(r);
             i++;
         }
-        return arrayList;
+        return new RIPEntryHolder(arrayList, roverID);
     }
 
     /**
@@ -425,11 +434,12 @@ public class Rover extends Thread {
      *
      * @param datagramPacket the received RIP packet from another Rover.
      */
-    private ArrayList<RoutingTableEntry> unpackRIPEntries(DatagramPacket datagramPacket) {
+    private RIPEntryHolder unpackRIPEntries(DatagramPacket datagramPacket) {
         byte[] receivedRipPacket = new byte[datagramPacket.getLength()];
         System.arraycopy(datagramPacket.getData(), 0, receivedRipPacket, 0,
                 receivedRipPacket.length);
-        ArrayList<RoutingTableEntry> entries = decodeRIPPacket(receivedRipPacket);
+        RIPEntryHolder ripEntryHolder = decodeRIPPacket(receivedRipPacket);
+        ArrayList<RoutingTableEntry> entries = ripEntryHolder.getArrayList();
 
         if (verboseOutputs) {
             System.out.println("Received the following Table Entries from " + datagramPacket.getAddress().getHostAddress());
@@ -439,7 +449,7 @@ public class Rover extends Thread {
             }
         }
 
-        return entries;
+        return ripEntryHolder;
     }
 
     /**
@@ -451,18 +461,23 @@ public class Rover extends Thread {
      *                    request. Since it responded, the hop count is 1,
      *                    and the next hop is itself.
      */
-    private void addSingleRoutingEntry(InetAddress inetAddress) throws UnknownHostException {
-        if (inetAddress.getHostAddress().equals(selfIP)){
+    private void addSingleRoutingEntry(int receivedRoverId,
+                                       InetAddress inetAddress) {
+        if (receivedRoverId == roverID) {
             return;
         }
-        String ipToAdd = inetAddress.getHostAddress();
+//        if (inetAddress.getHostAddress().equals(selfIP)){
+//            return;
+//        }
+        String ipToAdd = generateRoverIpUsingID(receivedRoverId);
+        String nextHop = inetAddress.getHostAddress();
         boolean presentInTable = false;
         boolean changed = false;
         for (RoutingTableEntry routingTableEntry : routingTable) {
             if (routingTableEntry.IPAddress.equals(ipToAdd)) {       //TODO No. Must support mask
                 presentInTable = true;
                 if (routingTableEntry.cost != 1) {
-                    routingTableEntry.nextHop = routingTableEntry.IPAddress;
+                    routingTableEntry.nextHop = nextHop;
                     routingTableEntry.cost = 1;
                     changed = true;
                     break;
@@ -472,7 +487,7 @@ public class Rover extends Thread {
 
         if (!presentInTable) {
             RoutingTableEntry r = new RoutingTableEntry(ipToAdd, DEFAULT_MASK
-                    , ipToAdd, (byte) 1);
+                    , nextHop, (byte) 1);
             routingTable.add(r);
             changed = true;
         }
@@ -480,6 +495,10 @@ public class Rover extends Thread {
         if (changed) {
             displayRoutingTable();
         }
+    }
+
+    private String generateRoverIpUsingID(int roverID) {
+        return "10.0." + roverID + ".0";
     }
 
     /**
@@ -491,7 +510,7 @@ public class Rover extends Thread {
         System.out.println("Routing Table Entries");
         System.out.println("Address\t\tNextHop\t\tCost");
         for (RoutingTableEntry r : routingTable) {
-            System.out.println(r.IPAddress + "\t" + r.nextHop + "\t" + r.cost);
+            System.out.println(r.IPAddress + "/" + DEFAULT_MASK + "\t" + r.nextHop + "\t" + r.cost);
         }
         System.out.println();
     }
@@ -517,13 +536,16 @@ public class Rover extends Thread {
 
         for (RoutingTableEntry r : receivedTable) {
             String ipAddress = r.IPAddress;
+            int roverID = Integer.parseInt(ipAddress.split("\\.")[2]);
             RoutingTableEntry routingTableEntry =
                     findRoutingTableEntryForIp(ipAddress);
-            if (!ipAddress.equals(selfIP)) {
+//            if (!ipAddress.equals(selfIP)) {
+            if (roverID != this.roverID) {
                 byte cost = (byte) (r.cost + 1);
 
                 if (routingTableEntry == null) {
-                    routingTableEntry = new RoutingTableEntry(ipAddress,
+                    String localIP = generateRoverIpUsingID(roverID);
+                    routingTableEntry = new RoutingTableEntry(localIP,
                             DEFAULT_MASK, senderIp, cost);
                     routingTable.add(routingTableEntry);
                     updated = true;
@@ -557,6 +579,9 @@ public class Rover extends Thread {
                         }
                     }
                 }
+            }
+            if (r.cost > INFINITY){
+                r.cost = INFINITY;
             }
         }
 
