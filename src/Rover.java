@@ -274,7 +274,7 @@ public class Rover extends Thread {
      * <p>
      * If any timer reaches {@code TIMEOUT} successfully, it means that a
      * Rover timed out. The function then sets the distance of that Rover to
-     * INFINITY.
+     * INFINITY, and all next hops that were this IP to INFINITY.
      *
      * @param ipAddress an IP Address of a Rover that sent this Rover a RIP
      *                  packet directly. Hence, that Rover is the neighbour
@@ -303,13 +303,12 @@ public class Rover extends Thread {
                 }
                 displayRoutingTable();
                 try {
-                    sendRIPMessage();       //Triggered updates
+                    sendRIPMessage();       //Triggered update.
                 } catch (UnknownHostException e) {
                     e.printStackTrace();
                 }
             }
         }, TIMEOUT);
-
     }
 
     /**
