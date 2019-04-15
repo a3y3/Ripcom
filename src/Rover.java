@@ -33,6 +33,7 @@ public class Rover extends Thread {
     String MULTICAST_IP;
     int roverID;
     String destinationIP;
+    int UDP_PORT;
 
 
     /**

@@ -7,6 +7,7 @@ class ArgumentParser {
     private static final String MULTICAST_PORT_S = "-m";
     private static final String MULTICAST_IP_S = "-i";
     private static final String DESTINATION_IP_S = "-d";
+    private static final String UDP_PORT_S = "-u";
     private static final String VERBOSE_S = "-v";
     private static final String HELP_S = "-h";
 
@@ -15,6 +16,7 @@ class ArgumentParser {
     private static final String MULTICAST_PORT_L = "--multicast-port";
     private static final String MULTICAST_IP_L = "--multicast-ip";
     private static final String DESTINATION_IP_L = "--destination-ip";
+    private static final String UDP_PORT_L = "--udp-port";
     private static final String VERBOSE_L = "--verbose";
     private static final String HELP_L = "--help";
 
@@ -53,6 +55,9 @@ class ArgumentParser {
                 }
                 if (argument.equals(DESTINATION_IP_S) || argument.equals(DESTINATION_IP_L)) {
                     rover.destinationIP = args[i + 1];
+                }
+                if (argument.equals(UDP_PORT_S) || argument.equals(UDP_PORT_L)) {
+                    rover.UDP_PORT = Integer.parseInt(args[i + 1]);
                 }
             }
         } catch (Exception e) {
@@ -101,17 +106,17 @@ class ArgumentParser {
 
         System.out.println("List of flags");
 
-        System.out.println(ROVER_S +": Rover ID: This value should serve as an 8 bit" +
+        System.out.println(ROVER_S + ": Rover ID: This value should serve as an 8 bit" +
                 " identifier to each Rover. This is the only field that is " +
                 "not optional.");
         System.out.println();
 
         System.out.println("Optional flags:");
-        System.out.println(SOURCE_PORT_S +": Source Port: In  RIP, this field is 520. " +
+        System.out.println(SOURCE_PORT_S + ": Source Port: In  RIP, this field is 520. " +
                 "You will need to run the program as root to set this value as 520.");
         System.out.println();
 
-        System.out.println(MULTICAST_PORT_S +": multicast port. The port where " +
+        System.out.println(MULTICAST_PORT_S + ": multicast port. The port where " +
                 "the multicast messages are sent to.");
         System.out.println();
 
