@@ -29,7 +29,7 @@ class ArgumentParser {
         boolean missingArgument = false;
         boolean missingMulticastIP = true;
         boolean missingRoverID = true;
-
+        boolean missingUDPPort = true;
         try {
             for (int i = 0; i < args.length; i++) {
                 String argument = args[i];
@@ -58,6 +58,7 @@ class ArgumentParser {
                 }
                 if (argument.equals(UDP_PORT_S) || argument.equals(UDP_PORT_L)) {
                     rover.UDP_PORT = Integer.parseInt(args[i + 1]);
+                    missingUDPPort = false;
                 }
             }
         } catch (Exception e) {
@@ -84,9 +85,15 @@ class ArgumentParser {
             rover.MULTICAST_IP = "233.33.33.33";
             missingArgument = true;
         }
+        if (missingUDPPort){
+            System.out.println("Warning: UDP Port not specified, using port 6767");
+            rover.UDP_PORT = 6767;
+        }
         if (missingArgument) {
             System.out.println("See " + HELP_L + " for options");
         }
+
+
     }
 
     /**
