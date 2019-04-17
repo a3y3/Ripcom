@@ -66,63 +66,64 @@ public class Rover extends Thread {
     }
 
 
-    private void parseArguments(String[] args) throws ArgumentException {
-        boolean missingArgument = false;
-        boolean missingMulticastIP = true;
-        boolean missingRoverID = true;
-
-        try {
-            for (int i = 0; i < args.length; i++) {
-                String argument = args[i];
-                if (argument.equals("-v") || argument.equals("--verbose")) {
-                    verboseOutputs = true;
-                }
-                if (argument.equals("-m") || argument.equals("--multicast-port")) {
-                    MULTICAST_PORT = Integer.parseInt(args[i + 1]);
-                }
-                if (argument.equals("-p") || argument.equals("--port")) {
-                    RIP_PORT = Integer.parseInt(args[i + 1]);
-                }
-                if (argument.equals("-i") || argument.equals("--ip")) {
-                    MULTICAST_IP = args[i + 1];
-                    missingMulticastIP = false;
-                }
-                if (argument.equals("-r") || argument.equals("--rover-id")) {
-                    roverID = Integer.parseInt(args[i + 1]);
-                    missingRoverID = false;
-                }
-                if (argument.equals("-d") || argument.equals("--destination" +
-                        "-ip")) {
-                    destinationIP = args[i + 1];
-                }
-            }
-        } catch (Exception e) {
-            throw new ArgumentException("Your arguments are incorrect. Please" +
-                    " see --help for help and usage.");
-        }
-        if (missingRoverID) {
-            System.err.println("Error: Missing Rover ID. Exiting...");
-        }
-        if (MULTICAST_PORT == 0) {
-            System.out.println("Warning: Assuming Multicast port " + 20001);
-            MULTICAST_PORT = 20001;
-            missingArgument = true;
-        }
-        if (RIP_PORT == 0) {
-            System.out.println("Warning: Port not specified, using port " + 32768);
-            RIP_PORT = 32768;
-            missingArgument = true;
-        }
-        if (missingMulticastIP) {
-            System.out.println("Warning: Multicast IP not specified, using " +
-                    "default IP 233.33.33.33");
-            MULTICAST_IP = "233.33.33.33";
-            missingArgument = true;
-        }
-        if (missingArgument) {
-            System.out.println("See --help for options");
-        }
-    }
+//    private void parseArguments(String[] args) throws ArgumentException {
+//        boolean missingArgument = false;
+//        boolean missingMulticastIP = true;
+//        boolean missingRoverID = true;
+//
+//        try {
+//            for (int i = 0; i < args.length; i++) {
+//                String argument = args[i];
+//                if (argument.equals("-v") || argument.equals("--verbose")) {
+//                    verboseOutputs = true;
+//                }
+//                if (argument.equals("-m") || argument.equals("--multicast-port")) {
+//                    MULTICAST_PORT = Integer.parseInt(args[i + 1]);
+//                }
+//                if (argument.equals("-p") || argument.equals("--port")) {
+//                    RIP_PORT = Integer.parseInt(args[i + 1]);
+//                }
+//                if (argument.equals("-i") || argument.equals("--ip")) {
+//                    MULTICAST_IP = args[i + 1];
+//                    missingMulticastIP = false;
+//                }
+//                if (argument.equals("-r") || argument.equals("--rover-id")) {
+//                    roverID = Integer.parseInt(args[i + 1]);
+//                    missingRoverID = false;
+//                }
+//                if (argument.equals("-d") || argument.equals("--destination" +
+//                        "-ip")) {
+//                    destinationIP = args[i + 1];
+//                }
+//            }
+//        } catch (Exception e) {
+//            throw new ArgumentException("Your arguments are incorrect. Please" +
+//                    " see --help for help and usage.");
+//        }
+//        if (missingRoverID) {
+//            System.err.println("Error: Missing Rover ID. Exiting...");
+//        }
+//        if (MULTICAST_PORT == 0) {
+//            System.out.println("Warning: Assuming Multicast port " + 20001);
+//            MULTICAST_PORT = 20001;
+//            missingArgument = true;
+//        }
+//        if (RIP_PORT == 0) {
+//            System.out.println("Warning: Port not specified, using port " + 32768);
+//            RIP_PORT = 32768;
+//            missingArgument = true;
+//        }
+//        if (missingMulticastIP) {
+//            System.out.println("Warning: Multicast IP not specified, using " +
+//                    "default IP 233.33.33.33");
+//            MULTICAST_IP = "233.33.33.33";
+//            missingArgument = true;
+//        }
+//        if (missingArgument) {
+//            System.out.println("See --help for options");
+//        }
+//    }
+    //TODO remove this redundant parser if the newer one works correctly.
 
     /**
      * This method creates two threads; a listener thread that listens on
@@ -148,6 +149,23 @@ public class Rover extends Thread {
                 }
             }
         }, 0, UPDATE_FREQUENCY);
+
+
+        Thread udpServerThread = new Thread(() -> {
+            try {
+                udpServer();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
+        udpServerThread.start();
+
+        Thread ripcomPacketSender = new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+            }
+        });
     }
 
     /**
@@ -255,6 +273,24 @@ public class Rover extends Thread {
                 }
             }
         }, TIMEOUT);
+    }
+
+
+    private void udpServer() throws IOException {
+        DatagramSocket server = new DatagramSocket(UDP_PORT);
+        byte[] buffer = new byte[256];
+        while (true) {
+            DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+            server.receive(packet);
+            RipcomPacketUnpacker ripcomPacketUnpacker =
+                    new RipcomPacketUnpacker(packet.getData());
+            if(verboseOutputs) {
+                System.out.println("Received a Ripcom packet.");
+                System.out.println("Unpacking...");
+                String destinationIP = ripcomPacketUnpacker.getDestination();
+                System.out.println("Found destination IP as " + destinationIP);
+            }
+        }
     }
 
     /**
@@ -634,6 +670,5 @@ public class Rover extends Thread {
         new ArgumentParser().parseArguments(args, rover);
 //        rover.parseArguments(args);
         rover.startThreads();
-
     }
 }
