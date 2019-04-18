@@ -24,6 +24,7 @@ public class Rover extends Thread {
     private final static byte DEFAULT_MASK = 24;
     private final static int INFINITY = 16;     //Max hop count in RIP is 15
     private final static int TIMEOUT = 10000;   // unreachable at 10 secs
+    private final static int UDP_SEND_MAX_RETRIES = 10;
     private final String selfIP;
 
     //flags and args
@@ -159,13 +160,6 @@ public class Rover extends Thread {
             }
         });
         udpServerThread.start();
-
-        Thread ripcomPacketSender = new Thread(new Runnable() {
-            @Override
-            public void run() {
-
-            }
-        });
     }
 
     /**
@@ -273,24 +267,6 @@ public class Rover extends Thread {
                 }
             }
         }, TIMEOUT);
-    }
-
-
-    private void udpServer() throws IOException {
-        DatagramSocket server = new DatagramSocket(UDP_PORT);
-        byte[] buffer = new byte[256];
-        while (true) {
-            DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-            server.receive(packet);
-            RipcomPacketUnpacker ripcomPacketUnpacker =
-                    new RipcomPacketUnpacker(packet.getData());
-            if(verboseOutputs) {
-                System.out.println("Received a Ripcom packet.");
-                System.out.println("Unpacking...");
-                String destinationIP = ripcomPacketUnpacker.getDestination();
-                System.out.println("Found destination IP as " + destinationIP);
-            }
-        }
     }
 
     /**
@@ -403,7 +379,6 @@ public class Rover extends Thread {
             i += 3;
             String nextHopInStringForm = getIPAddressInStringForm(nextHop);
 
-
             byte cost = ripPacket[i];
 
             RoutingTableEntry r = new RoutingTableEntry(ipAddressStringForm,
@@ -458,7 +433,8 @@ public class Rover extends Thread {
         ArrayList<RoutingTableEntry> entries = ripEntryHolder.getArrayList();
 
         if (verboseOutputs) {
-            System.out.println("Received the following Table Entries from " + datagramPacket.getAddress().getHostAddress());
+            System.out.println("Received the following Table Entries from " +
+                    datagramPacket.getAddress().getHostAddress());
             System.out.println("Address\t\tNextHop\t\tCost");
             for (RoutingTableEntry r : entries) {
                 System.out.println(r.IPAddress + "\t" + r.nextHop + "\t" + r.cost);
@@ -657,6 +633,63 @@ public class Rover extends Thread {
         return routingTableEntry != null ? routingTableEntry.cost : INFINITY;
     }
 
+    private void udpServer() throws IOException {
+        DatagramSocket server = new DatagramSocket(UDP_PORT);
+        byte[] buffer = new byte[256];
+        while (true) {
+            DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+            server.receive(packet);
+            RipcomPacketUnpacker ripcomPacketUnpacker =
+                    new RipcomPacketUnpacker(packet.getData());
+
+            System.out.println("Received a Ripcom packet.");
+            System.out.println("Unpacking...");
+            String destinationIP = ripcomPacketUnpacker.getDestination();
+            System.out.println("Found destination IP as " + destinationIP);
+
+        }
+    }
+
+    private void sendRipcomPacket(String destinationIP) throws IOException,
+            InterruptedException {
+        ArrayList<Byte> packet = new ArrayList<>();
+        byte[] ipAddress = InetAddress.getByName(destinationIP).getAddress();
+        for (byte b : ipAddress) {
+            packet.add(b);
+        }
+        String hello = "Hello World";
+        System.out.println("Finding next hop for " + destinationIP);
+        RoutingTableEntry routingTableEntry = findRoutingTableEntryForIp(destinationIP);
+        int retryCounter = 0;
+        while (routingTableEntry == null) {
+            System.out.println("Could not find an entry for " + destinationIP + ". " +
+                    "Retrying in " + UPDATE_FREQUENCY + "ms ...");
+            Thread.sleep(UPDATE_FREQUENCY);
+            routingTableEntry = findRoutingTableEntryForIp(destinationIP);
+            retryCounter++;
+            if (retryCounter >= UDP_SEND_MAX_RETRIES) {
+                System.out.println("Max retry limit reached, giving up on sending to " + destinationIP);
+                return;
+            }
+        }
+        System.out.println("Found a next hop: " + routingTableEntry.nextHop);
+        DatagramSocket datagramSocket = new DatagramSocket();
+        byte[] helloBytes = hello.getBytes();
+        for (byte b : helloBytes) {
+            packet.add(b);
+        }
+        byte[] buffer = new byte[packet.size()];
+        int counter = 0;
+        for(byte b: packet){
+            buffer[counter++] = b;
+        }
+        InetAddress inetAddress = InetAddress.getByName(routingTableEntry.nextHop);
+        DatagramPacket datagramPacket = new DatagramPacket(buffer, buffer.length,
+                inetAddress, UDP_PORT);
+        datagramSocket.send(datagramPacket);
+        System.out.println("Sent successfully.");
+    }
+
     /**
      * Starts a new Rover, and initialises threads.
      *
@@ -665,10 +698,13 @@ public class Rover extends Thread {
      * @throws SocketException      see constructor
      * @throws UnknownHostException see constructor
      */
-    public static void main(String[] args) throws ArgumentException, SocketException, UnknownHostException {
+    public static void main(String[] args) throws ArgumentException, IOException, InterruptedException {
         Rover rover = new Rover();
         new ArgumentParser().parseArguments(args, rover);
 //        rover.parseArguments(args);
         rover.startThreads();
+        if (rover.destinationIP != null) {
+            rover.sendRipcomPacket(rover.destinationIP);
+        }
     }
 }

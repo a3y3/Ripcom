@@ -26,7 +26,7 @@ public class RipcomPacketUnpacker {
     String getDestination() {
         StringBuilder ipAddress = new StringBuilder();
         for (int i = IP_OFFSET; i < IP_OFFSET + 4; i++) {
-            int ipPart = packet[i];
+            int ipPart = Byte.toUnsignedInt(packet[i]);
             ipAddress.append(ipPart);
             if(i != IP_OFFSET + 3) {
                 ipAddress.append('.');
