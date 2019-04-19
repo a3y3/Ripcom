@@ -633,20 +633,31 @@ public class Rover extends Thread {
         return routingTableEntry != null ? routingTableEntry.cost : INFINITY;
     }
 
+    /**
+     * Listens for incoming Ripcom packets and, depending on whether the destination IP
+     * included inside is the Rover's own IP, sends it to the next hop or displays the
+     * message contents.
+     *
+     * @throws IOException if either:
+     * the datagram socket fails to initialize (SocketException)
+     * the {@code server.receive(packer)} method throws an IOException.
+     */
     private void udpServer() throws IOException {
         DatagramSocket server = new DatagramSocket(UDP_PORT);
         byte[] buffer = new byte[256];
         while (true) {
             DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
             server.receive(packet);
-            RipcomPacketUnpacker ripcomPacketUnpacker =
-                    new RipcomPacketUnpacker(packet.getData());
+            RipcomPacketManager ripcomPacketManager =
+                    new RipcomPacketManager(packet.getData());
 
             System.out.println("Received a Ripcom packet.");
             System.out.println("Unpacking...");
-            String destinationIP = ripcomPacketUnpacker.getDestination();
+            String destinationIP = ripcomPacketManager.getDestination();
             System.out.println("Found destination IP as " + destinationIP);
+            if (destinationIP.equals(getPrivateIP(roverID))){
 
+            }
         }
     }
 
@@ -682,25 +693,13 @@ public class Rover extends Thread {
 
     private void sendRipcomPacket(String destinationIP) throws IOException,
             InterruptedException {
-        ArrayList<Byte> packet = new ArrayList<>();
-        byte[] ipAddress = InetAddress.getByName(destinationIP).getAddress();
-        for (byte b : ipAddress) {
-            packet.add(b);
-        }
-        String hello = "Hello World";
         RoutingTableEntry routingTableEntry = getEntryforDestinationIP(destinationIP);
-        if(routingTableEntry != null) {
+        if (routingTableEntry != null) {
             System.out.println("Found a next hop: " + routingTableEntry.nextHop);
+            RipcomPacketManager ripcomPacketManager = new RipcomPacketManager();
+            byte[] buffer = ripcomPacketManager.getRipcomPacket(destinationIP);
+
             DatagramSocket datagramSocket = new DatagramSocket();
-            byte[] helloBytes = hello.getBytes();
-            for (byte b : helloBytes) {
-                packet.add(b);
-            }
-            byte[] buffer = new byte[packet.size()];
-            int counter = 0;
-            for (byte b : packet) {
-                buffer[counter++] = b;
-            }
             InetAddress inetAddress = InetAddress.getByName(routingTableEntry.nextHop);
             DatagramPacket datagramPacket = new DatagramPacket(buffer, buffer.length,
                     inetAddress, UDP_PORT);
