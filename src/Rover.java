@@ -178,6 +178,7 @@ public class Rover extends Thread {
                 socket.receive(datagramPacket);
                 RIPEntryHolder ripEntryHolder = unpackRIPEntries(datagramPacket);
                 int receivedRoverID = ripEntryHolder.getRoverID();
+                if (receivedRoverID == roverID){ continue;}
                 ArrayList<RoutingTableEntry> receivedEntries =
                         ripEntryHolder.getArrayList();
                 addSingleRoutingEntry(receivedRoverID,
@@ -658,10 +659,10 @@ public class Rover extends Thread {
             System.out.println("Received a Ripcom packet.");
             System.out.println("Unpacking...");
             String destinationIP = ripcomPacketManager.getDestination();
-            System.out.println("Found destination IP as " + destinationIP);
             if (destinationIP.equals(getPrivateIP(roverID))) {
                 ripcomPacketManager.displayPacketContents();
             } else {
+                System.out.println("Forwarding packet");
                 sendRipcomPacket(destinationIP);
             }
         }
@@ -701,7 +702,7 @@ public class Rover extends Thread {
             InterruptedException {
         RoutingTableEntry routingTableEntry = getEntryForDestinationIP(destinationIP);
         if (routingTableEntry != null) {
-            System.out.println("Found a next hop: " + routingTableEntry.nextHop);
+            System.out.println("Sending to: " + routingTableEntry.nextHop);
             RipcomPacketManager ripcomPacketManager = new RipcomPacketManager();
             byte[] buffer = ripcomPacketManager.getRipcomPacket(destinationIP);
 

@@ -71,7 +71,7 @@ class RipcomPacketManager {
     void displayPacketContents() {
         int length = Byte.toUnsignedInt(packet[LENGTH_OFFSET]);
         for (int i = CONTENTS_OFFSET; i < CONTENTS_OFFSET + length; i++){
-            System.out.print(packet[i]);
+            System.out.print((char)packet[i]);
         }
     }
 }
