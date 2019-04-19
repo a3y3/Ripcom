@@ -178,11 +178,12 @@ public class Rover extends Thread {
                 socket.receive(datagramPacket);
                 RIPEntryHolder ripEntryHolder = unpackRIPEntries(datagramPacket);
                 int receivedRoverID = ripEntryHolder.getRoverID();
-                if (receivedRoverID == roverID){ continue;}
+                if (receivedRoverID == roverID) {   //Ignore self packets
+                    continue;
+                }
                 ArrayList<RoutingTableEntry> receivedEntries =
                         ripEntryHolder.getArrayList();
-                addSingleRoutingEntry(receivedRoverID,
-                        datagramPacket.getAddress());
+                addSingleRoutingEntry(receivedRoverID, datagramPacket.getAddress());
                 startTimerFor(datagramPacket.getAddress().getHostAddress(),
                         receivedRoverID);
                 updateRoutingTable(receivedEntries, datagramPacket.getAddress());
@@ -684,9 +685,15 @@ public class Rover extends Thread {
         System.out.println("Finding next hop for " + destinationIP);
         RoutingTableEntry routingTableEntry = findRoutingTableEntryForIp(destinationIP);
         int retryCounter = 0;
-        while (routingTableEntry == null) {
-            System.out.println("Could not find an entry for " + destinationIP + ". " +
-                    "Retrying in " + UPDATE_FREQUENCY + "ms ...");
+        while (routingTableEntry == null || routingTableEntry.cost == INFINITY) {
+            if(routingTableEntry == null) {
+                System.out.println("Could not find an entry for " + destinationIP + ". " +
+                        "Retrying in " + UPDATE_FREQUENCY + "ms ...");
+            }
+            else{
+                System.out.println("Cannot send packet to " + destinationIP + " as the " +
+                        "cost is " + INFINITY + ". Will retry again in " + UPDATE_FREQUENCY + " ms ...");
+            }
             Thread.sleep(UPDATE_FREQUENCY);
             routingTableEntry = findRoutingTableEntryForIp(destinationIP);
             retryCounter++;
