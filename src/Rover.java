@@ -650,14 +650,19 @@ public class Rover extends Thread {
         }
     }
 
-    private void sendRipcomPacket(String destinationIP) throws IOException,
-            InterruptedException {
-        ArrayList<Byte> packet = new ArrayList<>();
-        byte[] ipAddress = InetAddress.getByName(destinationIP).getAddress();
-        for (byte b : ipAddress) {
-            packet.add(b);
-        }
-        String hello = "Hello World";
+    /**
+     * Finds a RoutingTableEntry for a destination IP address. However, unlike {@code
+     * findRoutingTableEntryForIp(destinationIP)}, this method will keep trying to find
+     * the entry for a maximum of {@code UDP_SEND_MAX_RETRIES}. The method will also
+     * sleep for {@code TIMEOUT} ms between two consecutive retries.
+     *
+     * @param destinationIP represents what IP to send a packet to. Will be of the form
+     *                      10.0.{rover_id}.0
+     * @return the found RoutingTableEntry, else null if {@code UDP_SEND_MAX_RETRIES}
+     * is exceeded.
+     * @throws InterruptedException if the thread is interrupted while sleeping (unlikely)
+     */
+    private RoutingTableEntry getEntryforDestinationIP(String destinationIP) throws InterruptedException {
         System.out.println("Finding next hop for " + destinationIP);
         RoutingTableEntry routingTableEntry = findRoutingTableEntryForIp(destinationIP);
         int retryCounter = 0;
@@ -669,31 +674,45 @@ public class Rover extends Thread {
             retryCounter++;
             if (retryCounter >= UDP_SEND_MAX_RETRIES) {
                 System.out.println("Max retry limit reached, giving up on sending to " + destinationIP);
-                return;
+                return null;
             }
         }
-        System.out.println("Found a next hop: " + routingTableEntry.nextHop);
-        DatagramSocket datagramSocket = new DatagramSocket();
-        byte[] helloBytes = hello.getBytes();
-        for (byte b : helloBytes) {
+        return routingTableEntry;
+    }
+
+    private void sendRipcomPacket(String destinationIP) throws IOException,
+            InterruptedException {
+        ArrayList<Byte> packet = new ArrayList<>();
+        byte[] ipAddress = InetAddress.getByName(destinationIP).getAddress();
+        for (byte b : ipAddress) {
             packet.add(b);
         }
-        byte[] buffer = new byte[packet.size()];
-        int counter = 0;
-        for(byte b: packet){
-            buffer[counter++] = b;
+        String hello = "Hello World";
+        RoutingTableEntry routingTableEntry = getEntryforDestinationIP(destinationIP);
+        if(routingTableEntry != null) {
+            System.out.println("Found a next hop: " + routingTableEntry.nextHop);
+            DatagramSocket datagramSocket = new DatagramSocket();
+            byte[] helloBytes = hello.getBytes();
+            for (byte b : helloBytes) {
+                packet.add(b);
+            }
+            byte[] buffer = new byte[packet.size()];
+            int counter = 0;
+            for (byte b : packet) {
+                buffer[counter++] = b;
+            }
+            InetAddress inetAddress = InetAddress.getByName(routingTableEntry.nextHop);
+            DatagramPacket datagramPacket = new DatagramPacket(buffer, buffer.length,
+                    inetAddress, UDP_PORT);
+            datagramSocket.send(datagramPacket);
+            System.out.println("Sent successfully.");
         }
-        InetAddress inetAddress = InetAddress.getByName(routingTableEntry.nextHop);
-        DatagramPacket datagramPacket = new DatagramPacket(buffer, buffer.length,
-                inetAddress, UDP_PORT);
-        datagramSocket.send(datagramPacket);
-        System.out.println("Sent successfully.");
     }
 
     /**
      * Starts a new Rover, and initialises threads.
      *
-     * @param args STDIN. Passed to {@code parseArguments()}
+     * @param args STDIN. Passed to {@code ArgumentParser.parseArguments()}
      * @throws ArgumentException    if arguments were passed incorrectly.
      * @throws SocketException      see constructor
      * @throws UnknownHostException see constructor
