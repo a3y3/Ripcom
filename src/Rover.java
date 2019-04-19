@@ -655,13 +655,15 @@ public class Rover extends Thread {
             DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
             server.receive(packet);
             RipcomPacketManager ripcomPacketManager =
-                    new RipcomPacketManager(packet.getData());
+                    new RipcomPacketManager();
+            RipcomPacket ripcomPacket =
+                    ripcomPacketManager.constructRipcomPacket(packet.getData());
 
             System.out.println("Received a Ripcom packet.");
             System.out.println("Unpacking...");
-            String destinationIP = ripcomPacketManager.getDestination();
+            String destinationIP = ripcomPacket.getDestinationIP();
             if (destinationIP.equals(getPrivateIP(roverID))) {
-                ripcomPacketManager.displayPacketContents();
+                System.out.println(ripcomPacket.getContents());
             } else {
                 System.out.println("Forwarding packet");
                 sendRipcomPacket(destinationIP);
@@ -686,11 +688,10 @@ public class Rover extends Thread {
         RoutingTableEntry routingTableEntry = findRoutingTableEntryForIp(destinationIP);
         int retryCounter = 0;
         while (routingTableEntry == null || routingTableEntry.cost == INFINITY) {
-            if(routingTableEntry == null) {
+            if (routingTableEntry == null) {
                 System.out.println("Could not find an entry for " + destinationIP + ". " +
                         "Retrying in " + UPDATE_FREQUENCY + "ms ...");
-            }
-            else{
+            } else {
                 System.out.println("Cannot send packet to " + destinationIP + " as the " +
                         "cost is " + INFINITY + ". Will retry again in " + UPDATE_FREQUENCY + " ms ...");
             }
@@ -710,8 +711,8 @@ public class Rover extends Thread {
         RoutingTableEntry routingTableEntry = getEntryForDestinationIP(destinationIP);
         if (routingTableEntry != null) {
             System.out.println("Sending to: " + routingTableEntry.nextHop);
-            RipcomPacketManager ripcomPacketManager = new RipcomPacketManager();
-            byte[] buffer = ripcomPacketManager.getRipcomPacket(destinationIP);
+            RipcomPacket ripcomPacket = new RipcomPacket(destinationIP, "A better way!");
+            byte[] buffer = ripcomPacket.getBytes();
 
             DatagramSocket datagramSocket = new DatagramSocket();
             InetAddress inetAddress = InetAddress.getByName(routingTableEntry.nextHop);
