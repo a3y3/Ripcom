@@ -155,7 +155,7 @@ public class Rover extends Thread {
         Thread udpServerThread = new Thread(() -> {
             try {
                 udpServer();
-            } catch (IOException e) {
+            } catch (IOException | InterruptedException e) {
                 e.printStackTrace();
             }
         });
@@ -638,11 +638,15 @@ public class Rover extends Thread {
      * included inside is the Rover's own IP, sends it to the next hop or displays the
      * message contents.
      *
-     * @throws IOException if either:
-     * the datagram socket fails to initialize (SocketException)
-     * the {@code server.receive(packer)} method throws an IOException.
+     * @throws IOException          if either:
+     *                              the datagram socket fails to initialize
+     *                              (SocketException), or
+     *                              the {@code server.receive(packet)} method throws an
+     *                              IOException.
+     * @throws InterruptedException if the thread is interrupted while executing
+     *                              {@code sendRipcomPacket()}
      */
-    private void udpServer() throws IOException {
+    private void udpServer() throws IOException, InterruptedException {
         DatagramSocket server = new DatagramSocket(UDP_PORT);
         byte[] buffer = new byte[256];
         while (true) {
@@ -655,8 +659,10 @@ public class Rover extends Thread {
             System.out.println("Unpacking...");
             String destinationIP = ripcomPacketManager.getDestination();
             System.out.println("Found destination IP as " + destinationIP);
-            if (destinationIP.equals(getPrivateIP(roverID))){
-
+            if (destinationIP.equals(getPrivateIP(roverID))) {
+                ripcomPacketManager.displayPacketContents();
+            } else {
+                sendRipcomPacket(destinationIP);
             }
         }
     }
@@ -673,7 +679,7 @@ public class Rover extends Thread {
      * is exceeded.
      * @throws InterruptedException if the thread is interrupted while sleeping (unlikely)
      */
-    private RoutingTableEntry getEntryforDestinationIP(String destinationIP) throws InterruptedException {
+    private RoutingTableEntry getEntryForDestinationIP(String destinationIP) throws InterruptedException {
         System.out.println("Finding next hop for " + destinationIP);
         RoutingTableEntry routingTableEntry = findRoutingTableEntryForIp(destinationIP);
         int retryCounter = 0;
@@ -693,7 +699,7 @@ public class Rover extends Thread {
 
     private void sendRipcomPacket(String destinationIP) throws IOException,
             InterruptedException {
-        RoutingTableEntry routingTableEntry = getEntryforDestinationIP(destinationIP);
+        RoutingTableEntry routingTableEntry = getEntryForDestinationIP(destinationIP);
         if (routingTableEntry != null) {
             System.out.println("Found a next hop: " + routingTableEntry.nextHop);
             RipcomPacketManager ripcomPacketManager = new RipcomPacketManager();
@@ -719,7 +725,6 @@ public class Rover extends Thread {
     public static void main(String[] args) throws ArgumentException, IOException, InterruptedException {
         Rover rover = new Rover();
         new ArgumentParser().parseArguments(args, rover);
-//        rover.parseArguments(args);
         rover.startThreads();
         if (rover.destinationIP != null) {
             rover.sendRipcomPacket(rover.destinationIP);
