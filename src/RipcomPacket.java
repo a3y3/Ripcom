@@ -7,6 +7,7 @@ import java.util.ArrayList;
  */
 class RipcomPacket {
     private String destinationIP;
+
     private int length;
     private String contents;
 

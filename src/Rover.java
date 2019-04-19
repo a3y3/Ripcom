@@ -29,12 +29,13 @@ public class Rover extends Thread {
 
     //flags and args
     boolean verboseOutputs;
-    int MULTICAST_PORT = 0;
-    int RIP_PORT = 0;
-    String MULTICAST_IP;
+    int multicastPort = 0;
+    int ripPort = 0;
+    String multicastIp;
     int roverID;
     String destinationIP;
-    int UDP_PORT;
+    int udpPort;
+    String fileName;
 
 
     /**
@@ -79,13 +80,13 @@ public class Rover extends Thread {
 //                    verboseOutputs = true;
 //                }
 //                if (argument.equals("-m") || argument.equals("--multicast-port")) {
-//                    MULTICAST_PORT = Integer.parseInt(args[i + 1]);
+//                    multicastPort = Integer.parseInt(args[i + 1]);
 //                }
 //                if (argument.equals("-p") || argument.equals("--port")) {
-//                    RIP_PORT = Integer.parseInt(args[i + 1]);
+//                    ripPort = Integer.parseInt(args[i + 1]);
 //                }
 //                if (argument.equals("-i") || argument.equals("--ip")) {
-//                    MULTICAST_IP = args[i + 1];
+//                    multicastIp = args[i + 1];
 //                    missingMulticastIP = false;
 //                }
 //                if (argument.equals("-r") || argument.equals("--rover-id")) {
@@ -104,20 +105,20 @@ public class Rover extends Thread {
 //        if (missingRoverID) {
 //            System.err.println("Error: Missing Rover ID. Exiting...");
 //        }
-//        if (MULTICAST_PORT == 0) {
+//        if (multicastPort == 0) {
 //            System.out.println("Warning: Assuming Multicast port " + 20001);
-//            MULTICAST_PORT = 20001;
+//            multicastPort = 20001;
 //            missingArgument = true;
 //        }
-//        if (RIP_PORT == 0) {
+//        if (ripPort == 0) {
 //            System.out.println("Warning: Port not specified, using port " + 32768);
-//            RIP_PORT = 32768;
+//            ripPort = 32768;
 //            missingArgument = true;
 //        }
 //        if (missingMulticastIP) {
 //            System.out.println("Warning: Multicast IP not specified, using " +
 //                    "default IP 233.33.33.33");
-//            MULTICAST_IP = "233.33.33.33";
+//            multicastIp = "233.33.33.33";
 //            missingArgument = true;
 //        }
 //        if (missingArgument) {
@@ -167,9 +168,9 @@ public class Rover extends Thread {
      */
     private void startListening() {
         try {
-            MulticastSocket socket = new MulticastSocket(MULTICAST_PORT);
+            MulticastSocket socket = new MulticastSocket(multicastPort);
             byte[] buffer = new byte[256];
-            InetAddress iGroup = InetAddress.getByName(MULTICAST_IP);
+            InetAddress iGroup = InetAddress.getByName(multicastIp);
             socket.joinGroup(iGroup);
 
             while (true) {
@@ -206,16 +207,16 @@ public class Rover extends Thread {
         InetAddress iGroup = null;
 
         try {
-            iGroup = InetAddress.getByName(MULTICAST_IP);
+            iGroup = InetAddress.getByName(multicastIp);
         } catch (UnknownHostException e) {
             e.printStackTrace();
         }
         DatagramPacket datagramPacket = new DatagramPacket(buffer, buffer.length,
-                iGroup, MULTICAST_PORT);
+                iGroup, multicastPort);
 
         DatagramSocket datagramSocket;
         try {
-            datagramSocket = new DatagramSocket(RIP_PORT);
+            datagramSocket = new DatagramSocket(ripPort);
             datagramSocket.send(datagramPacket);
             datagramSocket.close();
         } catch (IOException e) {
@@ -649,7 +650,7 @@ public class Rover extends Thread {
      *                              {@code sendRipcomPacket()}
      */
     private void udpServer() throws IOException, InterruptedException {
-        DatagramSocket server = new DatagramSocket(UDP_PORT);
+        DatagramSocket server = new DatagramSocket(udpPort);
         byte[] buffer = new byte[256];
         while (true) {
             DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
@@ -717,12 +718,15 @@ public class Rover extends Thread {
             DatagramSocket datagramSocket = new DatagramSocket();
             InetAddress inetAddress = InetAddress.getByName(routingTableEntry.nextHop);
             DatagramPacket datagramPacket = new DatagramPacket(buffer, buffer.length,
-                    inetAddress, UDP_PORT);
+                    inetAddress, udpPort);
             datagramSocket.send(datagramPacket);
             System.out.println("Sent successfully.");
         }
     }
 
+    private void fragmentAndSend(String destinationIP){
+
+    }
     /**
      * Starts a new Rover, and initialises threads.
      *
