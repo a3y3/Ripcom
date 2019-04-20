@@ -712,7 +712,9 @@ public class Rover extends Thread {
         RoutingTableEntry routingTableEntry = getEntryForDestinationIP(destinationIP);
         if (routingTableEntry != null) {
             System.out.println("Sending to: " + routingTableEntry.nextHop);
-            RipcomPacket ripcomPacket = new RipcomPacket(destinationIP, "A better way!");
+            RipcomPacket.Type packetType = RipcomPacket.Type.SEQ;
+            RipcomPacket ripcomPacket = new RipcomPacket(destinationIP, packetType,
+                    "A better way!");
             byte[] buffer = ripcomPacket.getBytes();
 
             DatagramSocket datagramSocket = new DatagramSocket();
