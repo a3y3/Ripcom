@@ -65,8 +65,8 @@ class ArgumentParser {
                     rover.udpPort = Integer.parseInt(args[i + 1]);
                     missingUDPPort = false;
                 }
-                if (argument.equals(FILE_NAME_S) || argument.equals(FILE_NAME_L)){
-                    rover.fileName = args[i+1];
+                if (argument.equals(FILE_NAME_S) || argument.equals(FILE_NAME_L)) {
+                    rover.fileName = args[i + 1];
                     missingFileName = false;
                 }
             }
@@ -94,12 +94,12 @@ class ArgumentParser {
             rover.multicastIp = "233.33.33.33";
             missingArgument = true;
         }
-        if (missingUDPPort){
+        if (missingUDPPort) {
             System.out.println("Warning: UDP Port not specified, using port 6767");
             rover.udpPort = 6767;
             missingArgument = true;
         }
-        if ((missingFileName && !missingDestinationIP) || (missingDestinationIP && !missingFileName)){
+        if ((missingFileName && !missingDestinationIP) || (missingDestinationIP && !missingFileName)) {
             System.err.println("Error: It appears that you have missed either the " +
                     "file name or the destination IP address. These two fields are " +
                     "optional, however, must be provided with each other if they are " +
@@ -117,50 +117,70 @@ class ArgumentParser {
      */
     private void displayHelp() {
         System.out.println();
+//        String usage = "Usage: java Rover [" + ROVER_S + " | " + ROVER_L + "] VALUE | " +
+//                "[" + SOURCE_PORT_S + " | " + SOURCE_PORT_L + "] VALUE | " +
+//                "[" + MULTICAST_PORT_S + " | " + MULTICAST_PORT_L + "] VALUE | " +
+//                "[" + MULTICAST_IP_S + " | " + MULTICAST_IP_L + "] VALUE | " +
+//                "[" + VERBOSE_S + " | " + VERBOSE_L + "]";
         String usage = "Usage: java Rover [" + ROVER_S + " | " + ROVER_L + "] VALUE | " +
-                "[" + SOURCE_PORT_S + " | " + SOURCE_PORT_L + "] VALUE | " +
-                "[" + MULTICAST_PORT_S + " | " + MULTICAST_PORT_L + "] VALUE | " +
-                "[" + MULTICAST_IP_S + " | " + MULTICAST_IP_L + "] VALUE | " +
-                "[" + VERBOSE_S + " | " + VERBOSE_L + "]";
+                "[OPTIONAL_FLAG_1 VALUE_1] [OPTIONAL_FLAG_2 VALUE_2] [...]";
         System.out.println(usage);
         System.out.println();
 
 
         System.out.println("List of flags");
 
-        System.out.println(ROVER_S + ": Rover ID: This value should serve as an 8 bit" +
+        System.out.println(ROVER_S + ": Rover ID: This value should serve as a 1 byte" +
                 " identifier to each Rover. This is the only field that is " +
                 "not optional.");
         System.out.println();
 
         System.out.println("Optional flags:");
-        System.out.println(SOURCE_PORT_S + ": Source Port: In  RIP, this field is 520. " +
-                "You will need to run the program as root to set this value as 520.");
+        System.out.println("[" + SOURCE_PORT_S + " | " + SOURCE_PORT_L + "]: Source " +
+                "Port:" +
+                " " +
+                "In  " +
+                "RIP, this field is 520. You will need to run the program as root to " +
+                "set this value as 520.");
         System.out.println();
 
-        System.out.println(MULTICAST_PORT_S + ": multicast port. The port where " +
-                "the multicast messages are sent to.");
+        System.out.println("[" + MULTICAST_PORT_S + " | " + MULTICAST_PORT_L + "]: " +
+                "multicast " +
+                "port. The port where the multicast messages are sent to.");
         System.out.println();
 
-        System.out.println(MULTICAST_IP_S + ": multicast IP. The IP where messages " +
-                "are sent to. Defaulted to 233.33.33.33 if not specified.");
+        System.out.println("[" + MULTICAST_IP_S + " | " + MULTICAST_IP_L + "]: multicast" +
+                " " +
+                "IP" +
+                ". " +
+                "The IP where messages are sent to. Defaulted to 233.33.33.33 if not " +
+                "specified.");
         System.out.println();
 
-        System.out.println(UDP_PORT_S + ": the port a Rover will listen on for Ripcom " +
-                "packets.");
+        System.out.println("[" + UDP_PORT_S + " | " + UDP_PORT_L + "]: the port a Rover " +
+                "will " +
+                "listen on for Ripcom packets.");
         System.out.println();
 
-        System.out.println(FILE_NAME_S + ": the file that is to be transmitted. This " +
-                "parameter MUST exist along with the -d flag.");
+        System.out.println("[" + FILE_NAME_S + " | " + FILE_NAME_L + "]: the file that " +
+                "is" +
+                " " +
+                "to be" +
+                " transmitted. If provided, it MUST exist along with the " +
+                "-d flag.");
         System.out.println();
 
-        System.out.println(DESTINATION_IP_S + ": the IP address of the destination " +
-                "Rover. Must be of the form \"10.0.<rover_id>.0\"");
+        System.out.println("[" + DESTINATION_IP_S + " | " + DESTINATION_IP_L + "]: the " +
+                "IP" +
+                " " +
+                "address of the destination Rover. Must be of the form \"10.0" +
+                ".<rover_id>.0\"");
         System.out.println();
 
-        System.out.println(VERBOSE_S + ": verbose mode. In this mode, every received " +
-                "packet is displayed, and the current routing table is " +
-                "displayed at every available opportunity.");
+        System.out.println("[" + VERBOSE_S + " | " + VERBOSE_L + "]: verbose mode. In " +
+                "this " +
+                "mode, every received packet is displayed, and the current routing " +
+                "table is displayed at every available opportunity.");
         System.out.println();
 
         System.exit(1);
