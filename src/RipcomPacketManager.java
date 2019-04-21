@@ -1,3 +1,5 @@
+import java.nio.ByteBuffer;
+
 /**
  * @author Soham Dongargaonkar [sd4324] on 19/4/19
  */
@@ -6,7 +8,8 @@ class RipcomPacketManager {
     private static final int DESTINATION_IP_OFFSET = 0;
     private static final int SOURCE_IP_OFFSET = 4;
     private static final int PACKET_TYPE_OFFSET = 8;
-    private static final int CONTENTS_OFFSET = 9;
+    private static final int NUMBER_OFFSET = 9;
+    private static final int CONTENTS_OFFSET = 13;
 
     RipcomPacketManager() {
     }
@@ -18,7 +21,7 @@ class RipcomPacketManager {
      * @param packet byte representation of a RipcomPacket
      * @return instance of RipcomPacket
      */
-    RipcomPacket constructRipcomPacket(byte[] packet) {
+    RipcomPacket getPacketFromByteRepresentation(byte[] packet) {
         StringBuilder destinationIP = getIP(DESTINATION_IP_OFFSET, packet);
 
         StringBuilder sourceIP = getIP(SOURCE_IP_OFFSET, packet);
@@ -36,18 +39,32 @@ class RipcomPacketManager {
                 packetType = RipcomPacket.Type.FIN;
         }
 
+        byte[] numsArray = new byte[4];
+        System.arraycopy(packet, NUMBER_OFFSET, numsArray, 0, 4);
+
+        int number = ByteBuffer.wrap(numsArray).getInt();
+
         StringBuilder contents = new StringBuilder();
         for (int i = CONTENTS_OFFSET; i < packet.length; i++) {
             contents.append((char) packet[i]);
         }
 
         return new RipcomPacket(destinationIP.toString(), sourceIP.toString(), packetType,
-                contents.toString());
+                number, contents.toString());
     }
 
-    private StringBuilder getIP(int offset, byte[] packet){
+    /**
+     * Used for getting a String IP address from the destination and source offsets (to
+     * avoid duplicate code!)
+     *
+     * @param offset either the source IP or the destination IP offset.
+     * @param packet representation of a RipcomPacket in bytes
+     * @return the corresponding IP address (depending on {@code offset} in
+     * StringBuilder form.
+     */
+    private StringBuilder getIP(int offset, byte[] packet) {
         StringBuilder ip = new StringBuilder();
-        for (int i = offset; i < offset+ 4; i++) {
+        for (int i = offset; i < offset + 4; i++) {
             int ipPart = Byte.toUnsignedInt(packet[i]);
             ip.append(ipPart);
             if (i != offset + 3) {
