@@ -35,13 +35,15 @@ class RipcomPacketManager {
             case 2:
                 packetType = RipcomPacket.Type.ACK;
                 break;
+            case 3:
+                packetType = RipcomPacket.Type.FIN_ACK;
+                break;
             default:
                 packetType = RipcomPacket.Type.FIN;
         }
 
         byte[] numsArray = new byte[4];
         System.arraycopy(packet, NUMBER_OFFSET, numsArray, 0, 4);
-
         int number = ByteBuffer.wrap(numsArray).getInt();
 
         StringBuilder contents = new StringBuilder();

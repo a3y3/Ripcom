@@ -20,6 +20,11 @@ public class Rover extends Thread {
     private HashMap<String, Timer> timers = new HashMap<>();
     private HashMap<Integer, RipcomPacket> window = new HashMap<>();
 
+    private int seqNumber = 0;
+    private int ackNumber = 0;
+    private String receivedContent = "";
+    private DataInputStream dataInputStream;
+
     //final variables
     private final static int UPDATE_FREQUENCY = 5000; //5 seconds
     private final static byte DEFAULT_MASK = 24;
@@ -27,13 +32,14 @@ public class Rover extends Thread {
     private final static int TIMEOUT = 10000;   // unreachable at 10 secs
     private final static int UDP_SEND_MAX_RETRIES = 10;
     private final static int BUFFER_CAPACITY = 200;
-    private final static int WINDOW_SIZE = 5;
+    private final static int WINDOW_SIZE = 1;
 
     private final String selfIP;
 
 
     //flags and args
     boolean verboseOutputs;
+    int verboseLevel = 0;   //Default level, display everything.
     int multicastPort = 0;
     int ripPort = 0;
     String multicastIp;
@@ -669,11 +675,47 @@ public class Rover extends Thread {
             System.out.println("Unpacking...");
             String destinationIP = ripcomPacket.getDestinationIP();
             if (destinationIP.equals(getPrivateIP(roverID))) {
-                System.out.println(ripcomPacket);
+                acceptPacket(ripcomPacket);
             } else {
                 System.out.println("Forwarding packet");
                 sendPacket(ripcomPacket);
             }
+        }
+    }
+
+    private void acceptPacket(RipcomPacket ripcomPacket) throws IOException, InterruptedException {
+        RipcomPacket.Type packetType = ripcomPacket.getPacketType();
+        switch (packetType) {
+            case SEQ:
+                //Someone is sending a message, must ACK!
+                if (ripcomPacket.getNumber() < ackNumber) {
+                    return; //ignore duplicate packet
+                }
+                ackNumber++;
+                receivedContent += ripcomPacket.getContents();
+                String destinationIP = ripcomPacket.getSourceIP();
+                RipcomPacket ackPacket = new RipcomPacket(
+                        destinationIP,
+                        getPrivateIP(roverID),
+                        RipcomPacket.Type.ACK,
+                        ackNumber,
+                        "");
+                sendPacket(ackPacket);
+                break;
+            case ACK:
+                int number = ripcomPacket.getNumber();
+                window.remove(number);
+                addToWindow(ripcomPacket.getSourceIP());
+                RipcomPacket nextPacket = window.get(number);
+                sendPacket(nextPacket);
+                break;
+            case FIN:
+                receivedContent += ripcomPacket.getContents();
+                System.out.println(receivedContent);
+                break;
+            case FIN_ACK:
+                System.out.println("Finished sending all data");
+                break;
         }
     }
 
@@ -729,20 +771,31 @@ public class Rover extends Thread {
         }
     }
 
-    private void addToWindow(String destinationIP, DataInputStream dataInputStream,
-                             RipcomPacket.Type type) throws IOException, InterruptedException {
+    /**
+     * Creates a new RipcomPacket, adds the packet to the window, and increments the
+     * sequence number.
+     *
+     * @param destinationIP the IP to which the packet is to be transmitted. Of the
+     *                      form 10.0.{@code roverID}.0
+     * @throws IOException while reading from the input stream.
+     */
+    private void addToWindow(String destinationIP) throws IOException {
+        RipcomPacket.Type type = RipcomPacket.Type.SEQ;
         byte[] dataBuffer = new byte[BUFFER_CAPACITY];
-        if (dataInputStream.read(dataBuffer) == -1) return;
-        RipcomPacketManager ripcomPacketManager = new RipcomPacketManager();
+        if (dataInputStream.read(dataBuffer) == -1) {
+            type = RipcomPacket.Type.FIN;
+        }
+        String contents = new String(dataBuffer);
+
         RipcomPacket ripcomPacket = new RipcomPacket(destinationIP,
-                getPrivateIP(roverID), type, 1234, "Yay!");
-        sendPacket(ripcomPacket);
+                getPrivateIP(roverID), type, seqNumber, contents);
+        window.put(seqNumber, ripcomPacket);
+        seqNumber++;
     }
 
-    private void fragmentAndSend(String destinationIP, File file) throws IOException, InterruptedException {
-        DataInputStream dataInputStream = new DataInputStream(new FileInputStream(file));
-        for (int i = 0; i < WINDOW_SIZE; i++); {
-            addToWindow(destinationIP, dataInputStream, RipcomPacket.Type.SEQ);
+    private void fragmentAndSend(String destinationIP) throws IOException {
+        for (int i = 0; i < WINDOW_SIZE; i++) {
+            addToWindow(destinationIP);
         }
     }
 
@@ -761,7 +814,12 @@ public class Rover extends Thread {
         rover.startThreads();
         if (rover.destinationIP != null) {
             File file = new File(rover.fileName);
-            rover.fragmentAndSend(rover.destinationIP, file);
+            rover.dataInputStream = new DataInputStream(new FileInputStream(file));
+            rover.fragmentAndSend(rover.destinationIP);
+            for (int i = 0; i < WINDOW_SIZE; i++) {
+                RipcomPacket ripcomPacket = rover.window.get(i);
+                rover.sendPacket(ripcomPacket);
+            }
         }
     }
 }

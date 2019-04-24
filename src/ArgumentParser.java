@@ -42,6 +42,7 @@ class ArgumentParser {
                 }
                 if (argument.equals(VERBOSE_S) || argument.equals(VERBOSE_L)) {
                     rover.verboseOutputs = true;
+                    rover.verboseLevel = Integer.parseInt(args[i + 1]);
                 }
                 if (argument.equals(MULTICAST_PORT_S) || argument.equals(MULTICAST_PORT_L)) {
                     rover.multicastPort = Integer.parseInt(args[i + 1]);
@@ -177,10 +178,14 @@ class ArgumentParser {
                 ".<rover_id>.0\"");
         System.out.println();
 
-        System.out.println("[" + VERBOSE_S + " | " + VERBOSE_L + "]: verbose mode. In " +
-                "this " +
-                "mode, every received packet is displayed, and the current routing " +
-                "table is displayed at every available opportunity.");
+        System.out.println("[" + VERBOSE_S + " | " + VERBOSE_L + "]: verbose mode:\n " +
+                "LEVEL 0: Print all routing tables, all received" +
+                " tables whenever received, and all Ripcom packets that are " +
+                "received and should be forwarded.\n " +
+                "LEVEL 1: Print only Ripcom messages that are received and " +
+                "should be forwarded. \n" +
+                " LEVEL 2: Default option. Print a Ripcom message only when it reaches " +
+                "the  destination address.");   //TODO
         System.out.println();
 
         System.exit(1);

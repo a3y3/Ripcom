@@ -10,7 +10,8 @@ class RipcomPacket {
     enum Type {
         SEQ,
         ACK,
-        FIN
+        FIN,
+        FIN_ACK
     }
 
     private String destinationIP;   //bytes 0 - 3
@@ -72,15 +73,12 @@ class RipcomPacket {
             arrayList.add((byte) 1);
         } else if (packetType == Type.ACK) {            //Type
             arrayList.add((byte) 2);
+        } else if (packetType == Type.FIN_ACK) {
+            arrayList.add((byte) 3);
         } else {
             arrayList.add((byte) 0);
         }
 
-//        for (int i = 0; i < 4; i++) {                   //Number
-//            byte num = ((byte) (number >>> (i * 8)));
-//            System.out.println("Adding " + num);
-//            arrayList.add(num);
-//        }
         byte[] nums = ByteBuffer.allocate(4).putInt(number).array();
         for (byte n : nums) {                           //Number
             arrayList.add(n);
