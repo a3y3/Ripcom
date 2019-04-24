@@ -39,7 +39,7 @@ public class Rover extends Thread {
 
     //flags and args
     boolean verboseOutputs;
-    int verboseLevel = 0;   //Default level, display everything.
+    int verboseLevel = 200;
     int multicastPort = 0;
     int ripPort = 0;
     String multicastIp;
@@ -671,13 +671,17 @@ public class Rover extends Thread {
             RipcomPacket ripcomPacket =
                     ripcomPacketManager.getPacketFromByteRepresentation(packet.getData());
 
-            System.out.println("Received a Ripcom packet.");
-            System.out.println("Unpacking...");
+            if (verboseLevel <= 1) {
+                System.out.println("Received a Ripcom packet.");
+                System.out.println("Unpacking...");
+            }
             String destinationIP = ripcomPacket.getDestinationIP();
             if (destinationIP.equals(getPrivateIP(roverID))) {
                 acceptPacket(ripcomPacket);
             } else {
-                System.out.println("Forwarding packet");
+                if (verboseLevel <= 1) {
+                    System.out.println("Forwarding packet");
+                }
                 sendPacket(ripcomPacket);
             }
         }
@@ -704,7 +708,7 @@ public class Rover extends Thread {
                 break;
             case ACK:
                 int number = ripcomPacket.getNumber();
-                window.remove(number);
+                window.remove(number - 1);
                 addToWindow(ripcomPacket.getSourceIP());
                 RipcomPacket nextPacket = window.get(number);
                 sendPacket(nextPacket);
@@ -712,6 +716,14 @@ public class Rover extends Thread {
             case FIN:
                 receivedContent += ripcomPacket.getContents();
                 System.out.println(receivedContent);
+                destinationIP = ripcomPacket.getSourceIP();
+                RipcomPacket finAckPacket = new RipcomPacket(
+                        destinationIP,
+                        getPrivateIP(roverID),
+                        RipcomPacket.Type.FIN_ACK,
+                        ackNumber,
+                        "");
+                sendPacket(finAckPacket);
                 break;
             case FIN_ACK:
                 System.out.println("Finished sending all data");
@@ -732,7 +744,9 @@ public class Rover extends Thread {
      * @throws InterruptedException if the thread is interrupted while sleeping (unlikely)
      */
     private RoutingTableEntry getEntryForDestinationIP(String destinationIP) throws InterruptedException {
-        System.out.println("Finding next hop for " + destinationIP);
+        if (verboseLevel <= 1) {
+            System.out.println("Finding next hop for " + destinationIP);
+        }
         RoutingTableEntry routingTableEntry = findRoutingTableEntryForIp(destinationIP);
         int retryCounter = 0;
         while (routingTableEntry == null || routingTableEntry.cost == INFINITY) {
@@ -759,7 +773,9 @@ public class Rover extends Thread {
         String destinationIP = ripcomPacket.getDestinationIP();
         RoutingTableEntry routingTableEntry = getEntryForDestinationIP(destinationIP);
         if (routingTableEntry != null) {
-            System.out.println("Sending to: " + routingTableEntry.nextHop);
+            if (verboseLevel <= 1) {
+                System.out.println("Sending to: " + routingTableEntry.nextHop);
+            }
             byte[] buffer = ripcomPacket.getBytes();
 
             DatagramSocket datagramSocket = new DatagramSocket();
@@ -767,7 +783,9 @@ public class Rover extends Thread {
             DatagramPacket datagramPacket = new DatagramPacket(buffer, buffer.length,
                     inetAddress, udpPort);
             datagramSocket.send(datagramPacket);
-            System.out.println("Sent successfully.");
+            if (verboseLevel <= 1) {
+                System.out.println("Sent successfully.");
+            }
         }
     }
 

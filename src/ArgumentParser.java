@@ -178,13 +178,14 @@ class ArgumentParser {
                 ".<rover_id>.0\"");
         System.out.println();
 
-        System.out.println("[" + VERBOSE_S + " | " + VERBOSE_L + "]: verbose mode:\n " +
-                "LEVEL 0: Print all routing tables, all received" +
+        System.out.println("[" + VERBOSE_S + " | " + VERBOSE_L + "]: verbose mode " +
+                "<LEVEL>:\n " +
+                "0: Print all routing tables, all received" +
                 " tables whenever received, and all Ripcom packets that are " +
                 "received and should be forwarded.\n " +
-                "LEVEL 1: Print only Ripcom messages that are received and " +
-                "should be forwarded. \n" +
-                " LEVEL 2: Default option. Print a Ripcom message only when it reaches " +
+                "1: Print only Ripcom messages that are received and " +
+                "should be forwarded.\n " +
+                "2: Default option. Print a Ripcom message only when it reaches " +
                 "the  destination address.");   //TODO
         System.out.println();
 
