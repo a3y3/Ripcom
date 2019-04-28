@@ -1,7 +1,4 @@
-import java.io.DataInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,10 +24,11 @@ public class Rover extends Thread {
     private HashMap<Integer, RipcomPacket> window = new HashMap<>();
     private HashMap<Integer, Timer> packetTimer = new HashMap<>();
 
+    private DatagramSocket datagramSocket;
     private int seqNumber = 0;
     private int ackNumber = 0;
-    private String receivedContent = "";
     private DataInputStream dataInputStream;
+    private BufferedWriter bufferedWriter;
 
     //final variables
     private final static int UPDATE_FREQUENCY = 5000; //5 seconds
@@ -67,9 +65,10 @@ public class Rover extends Thread {
      * @throws UnknownHostException if internet connection fails, see {@code
      *                              getSelfIp()}
      */
-    private Rover() throws SocketException, UnknownHostException {
+    private Rover() throws SocketException, UnknownHostException, FileNotFoundException {
         routingTable = new ArrayList<>();
         selfIP = getSelfIP();
+        bufferedWriter = new BufferedWriter(new PrintWriter("output"));
     }
 
     /**
@@ -86,66 +85,18 @@ public class Rover extends Thread {
         return datagramSocket.getLocalAddress().getHostAddress();
     }
 
-
-//    private void parseArguments(String[] args) throws ArgumentException {
-//        boolean missingArgument = false;
-//        boolean missingMulticastIP = true;
-//        boolean missingRoverID = true;
-//
-//        try {
-//            for (int i = 0; i < args.length; i++) {
-//                String argument = args[i];
-//                if (argument.equals("-v") || argument.equals("--verbose")) {
-//                    verboseOutputs = true;
-//                }
-//                if (argument.equals("-m") || argument.equals("--multicast-port")) {
-//                    multicastPort = Integer.parseInt(args[i + 1]);
-//                }
-//                if (argument.equals("-p") || argument.equals("--port")) {
-//                    ripPort = Integer.parseInt(args[i + 1]);
-//                }
-//                if (argument.equals("-i") || argument.equals("--ip")) {
-//                    multicastIp = args[i + 1];
-//                    missingMulticastIP = false;
-//                }
-//                if (argument.equals("-r") || argument.equals("--rover-id")) {
-//                    roverID = Integer.parseInt(args[i + 1]);
-//                    missingRoverID = false;
-//                }
-//                if (argument.equals("-d") || argument.equals("--destination" +
-//                        "-ip")) {
-//                    destinationIP = args[i + 1];
-//                }
-//            }
-//        } catch (Exception e) {
-//            throw new ArgumentException("Your arguments are incorrect. Please" +
-//                    " see --help for help and usage.");
-//        }
-//        if (missingRoverID) {
-//            System.err.println("Error: Missing Rover ID. Exiting...");
-//        }
-//        if (multicastPort == 0) {
-//            System.out.println("Warning: Assuming Multicast port " + 20001);
-//            multicastPort = 20001;
-//            missingArgument = true;
-//        }
-//        if (ripPort == 0) {
-//            System.out.println("Warning: Port not specified, using port " + 32768);
-//            ripPort = 32768;
-//            missingArgument = true;
-//        }
-//        if (missingMulticastIP) {
-//            System.out.println("Warning: Multicast IP not specified, using " +
-//                    "default IP 233.33.33.33");
-//            multicastIp = "233.33.33.33";
-//            missingArgument = true;
-//        }
-//        if (missingArgument) {
-//            System.out.println("See --help for options");
-//        }
-//    }
-    //TODO remove this redundant parser if the newer one works correctly.
-
+    /**
+     * Used to create a new DatagramSocket with a {@code ripPort}. This method exists
+     * because {@code ripPort} is not known until after {@code ArgumentParser
+     * .parseArguments()} is executed.
+     */
+    private void assignDatagramSocket() {
+        try {
+            datagramSocket = new DatagramSocket(ripPort);
+        } catch (SocketException e) {
+            e.printStackTrace();
+        }
+    }
     /**
      * This method creates two threads; a listener thread that listens on
      * the multicast channel for RIP packets, and a Timer thread that calls
@@ -233,11 +184,8 @@ public class Rover extends Thread {
         DatagramPacket datagramPacket = new DatagramPacket(buffer, buffer.length,
                 iGroup, multicastPort);
 
-        DatagramSocket datagramSocket;
         try {
-            datagramSocket = new DatagramSocket(ripPort);
             datagramSocket.send(datagramPacket);
-            datagramSocket.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -739,7 +687,8 @@ public class Rover extends Thread {
                 }
                 if (expectedPacket) {
                     ackNumber++;
-                    receivedContent += ripcomPacket.getContents();
+                    String message = ripcomPacket.getContents();
+                    bufferedWriter.write(message);
                 }
                 String destinationIP = ripcomPacket.getSourceIP();
                 RipcomPacket ackPacket = new RipcomPacket(
@@ -767,8 +716,12 @@ public class Rover extends Thread {
                 if (verboseLevel <= 1) {
                     System.out.println("Received FIN " + ripcomPacket.getNumber());
                 }
-                receivedContent += ripcomPacket.getContents();
-                System.out.println(receivedContent);
+                String message = ripcomPacket.getContents();
+                bufferedWriter.write(message);
+                if (verboseLevel <= 2) {
+                    System.out.println("Received message successfully. See file output " +
+                            "for the final output.");
+                }
                 ackNumber++;
                 destinationIP = ripcomPacket.getSourceIP();
                 RipcomPacket finAckPacket = new RipcomPacket(
@@ -926,6 +879,7 @@ public class Rover extends Thread {
     public static void main(String[] args) throws ArgumentException, IOException, InterruptedException {
         Rover rover = new Rover();
         new ArgumentParser().parseArguments(args, rover);
+        rover.assignDatagramSocket();
         rover.startThreads();
         rover.startSendingIfFlag();
     }
