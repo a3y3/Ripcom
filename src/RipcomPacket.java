@@ -18,14 +18,16 @@ class RipcomPacket {
     private String sourceIP;        //bytes 4 - 7
     private Type packetType;        //bytes 8
     private int number;             //bytes 9 - 12
-    private String contents;        //bytes 13 - ..
+    private int length;             //bytes 13 - 16
+    private String contents;        //bytes 17 - ..
 
     RipcomPacket(String destinationIP, String sourceIP, Type packetType, int number,
-                 String contents) {
+                 int length, String contents) {
         this.destinationIP = destinationIP;
         this.sourceIP = sourceIP;
         this.packetType = packetType;
         this.number = number;
+        this.length = length;
         this.contents = contents;
     }
 
@@ -42,8 +44,12 @@ class RipcomPacket {
         return packetType;
     }
 
-    public int getNumber() {
+    int getNumber() {
         return number;
+    }
+
+    int getLength() {
+        return length;
     }
 
     String getContents() {
@@ -84,6 +90,11 @@ class RipcomPacket {
             arrayList.add(n);
         }
 
+        byte[] lengthBytes = ByteBuffer.allocate(4).putInt(length).array();
+        for (byte l : lengthBytes) {
+            arrayList.add(l);                           //Length
+        }
+
         byte[] contentsBytes = contents.getBytes();
         for (byte b : contentsBytes) {
             arrayList.add(b);                           //Message
@@ -98,11 +109,13 @@ class RipcomPacket {
 
     @Override
     public String toString() {
-        return "========== Received Ripcom Packet==========" + "\n" +
+        return "========== Ripcom Packet==========" + "\n" +
                 "Destination IP: " + destinationIP + "\n" +
                 "Source IP: " + sourceIP + "\n" +
                 "Type: " + packetType + "\n" +
                 "Number: " + number + "\n" +
-                "Contents: " + contents + "\n";
+                "Length: " + length + "\n" +
+                "Contents: " + contents + "\n" +
+                "Contents length: " + contents.length() + "\n";     //TODO remove
     }
 }

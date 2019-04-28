@@ -29,6 +29,8 @@ public class Rover extends Thread {
     private int ackNumber = 0;
     private DataInputStream dataInputStream;
     private BufferedWriter bufferedWriter;
+    private String receivedContents = "";
+    private long lengthCounter;
 
     //final variables
     private final static int UPDATE_FREQUENCY = 5000; //5 seconds
@@ -65,10 +67,9 @@ public class Rover extends Thread {
      * @throws UnknownHostException if internet connection fails, see {@code
      *                              getSelfIp()}
      */
-    private Rover() throws SocketException, UnknownHostException, FileNotFoundException {
+    private Rover() throws SocketException, UnknownHostException {
         routingTable = new ArrayList<>();
         selfIP = getSelfIP();
-        bufferedWriter = new BufferedWriter(new PrintWriter("output"));
     }
 
     /**
@@ -97,6 +98,7 @@ public class Rover extends Thread {
             e.printStackTrace();
         }
     }
+
     /**
      * This method creates two threads; a listener thread that listens on
      * the multicast channel for RIP packets, and a Timer thread that calls
@@ -496,7 +498,8 @@ public class Rover extends Thread {
      *
      * @param receivedTable A RIP table that was received by this Rover.
      */
-    private void updateRoutingTable(ArrayList<RoutingTableEntry> receivedTable, InetAddress inetAddress) throws UnknownHostException {
+    private void updateRoutingTable(ArrayList<RoutingTableEntry> receivedTable,
+                                    InetAddress inetAddress) throws UnknownHostException {
         String senderIp = inetAddress.getHostAddress();
         boolean updated = false;
 
@@ -630,6 +633,7 @@ public class Rover extends Thread {
             if (verboseLevel <= 1) {
                 System.out.println("Received a Ripcom packet.");
                 System.out.println("Unpacking...");
+                System.out.println(ripcomPacket);
             }
             String destinationIP = ripcomPacket.getDestinationIP();
             if (destinationIP.equals(getPrivateIP(roverID))) {
@@ -688,6 +692,11 @@ public class Rover extends Thread {
                 if (expectedPacket) {
                     ackNumber++;
                     String message = ripcomPacket.getContents();
+                    receivedContents += message;
+                    if (bufferedWriter == null) {
+                        bufferedWriter =
+                                new BufferedWriter(new PrintWriter("here.txt"));
+                    }
                     bufferedWriter.write(message);
                 }
                 String destinationIP = ripcomPacket.getSourceIP();
@@ -696,6 +705,7 @@ public class Rover extends Thread {
                         getPrivateIP(roverID),
                         RipcomPacket.Type.ACK,
                         ackNumber,
+                        0,
                         "");
                 window.remove(ackNumber - 1);
                 window.put(ackNumber, ackPacket);
@@ -717,10 +727,14 @@ public class Rover extends Thread {
                     System.out.println("Received FIN " + ripcomPacket.getNumber());
                 }
                 String message = ripcomPacket.getContents();
+                receivedContents += message;
                 bufferedWriter.write(message);
+                bufferedWriter.close();
+                System.out.println("Received message successfully. See file output " +
+                        "for the final output or run with java Rover -v 2 to see output" +
+                        " on STDOUT.");
                 if (verboseLevel <= 2) {
-                    System.out.println("Received message successfully. See file output " +
-                            "for the final output.");
+                    System.out.println("Message: " + receivedContents);
                 }
                 ackNumber++;
                 destinationIP = ripcomPacket.getSourceIP();
@@ -729,6 +743,7 @@ public class Rover extends Thread {
                         getPrivateIP(roverID),
                         RipcomPacket.Type.FIN_ACK,
                         ackNumber,
+                        0,
                         "");
                 window.remove(ackNumber - 1);
                 if (verboseLevel <= 1) {
@@ -797,7 +812,6 @@ public class Rover extends Thread {
                 System.out.println("Sending to: " + routingTableEntry.nextHop);
             }
             byte[] buffer = ripcomPacket.getBytes();
-
             DatagramSocket datagramSocket = new DatagramSocket();
             InetAddress inetAddress = InetAddress.getByName(routingTableEntry.nextHop);
             DatagramPacket datagramPacket = new DatagramPacket(buffer, buffer.length,
@@ -807,6 +821,16 @@ public class Rover extends Thread {
                 System.out.println("Sent successfully.");
             }
         }
+    }
+
+    private String stripContents(String contents) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < contents.length(); i++) {
+            char c = contents.charAt(i);
+            if (c != 0) sb.append(c);
+            else break;
+        }
+        return sb.toString();
     }
 
     /**
@@ -824,9 +848,15 @@ public class Rover extends Thread {
             type = RipcomPacket.Type.FIN;
         }
         String contents = new String(dataBuffer);
+        if (BUFFER_CAPACITY > lengthCounter) {
+            contents = stripContents(contents);
+        } else {
+            lengthCounter -= BUFFER_CAPACITY;
+        }
+
 
         RipcomPacket ripcomPacket = new RipcomPacket(destinationIP,
-                getPrivateIP(roverID), type, seqNumber, contents);
+                getPrivateIP(roverID), type, seqNumber, contents.length(), contents);
         window.put(seqNumber, ripcomPacket);
         seqNumber++;
     }
@@ -856,6 +886,7 @@ public class Rover extends Thread {
     private void startSendingIfFlag() throws IOException, InterruptedException {
         if (destinationIP != null) {
             File file = new File(fileName);
+            lengthCounter = fileName.length();
             dataInputStream = new DataInputStream(new FileInputStream(file));
             for (int i = 0; i < WINDOW_SIZE; i++) {
                 addToWindow(destinationIP);

@@ -9,7 +9,8 @@ class RipcomPacketManager {
     private static final int SOURCE_IP_OFFSET = 4;
     private static final int PACKET_TYPE_OFFSET = 8;
     private static final int NUMBER_OFFSET = 9;
-    private static final int CONTENTS_OFFSET = 13;
+    private static final int LENGTH_OFFSET = 13;
+    private static final int CONTENTS_OFFSET = 17;
 
     RipcomPacketManager() {
     }
@@ -46,13 +47,17 @@ class RipcomPacketManager {
         System.arraycopy(packet, NUMBER_OFFSET, numsArray, 0, 4);
         int number = ByteBuffer.wrap(numsArray).getInt();
 
+        byte[] lengthArray = new byte[4];
+        System.arraycopy(packet, LENGTH_OFFSET, lengthArray, 0, 4);
+        int length = ByteBuffer.wrap(lengthArray).getInt();
+
         StringBuilder contents = new StringBuilder();
-        for (int i = CONTENTS_OFFSET; i < packet.length; i++) {
+        for (int i = CONTENTS_OFFSET; i < CONTENTS_OFFSET + length; i++) {
             contents.append((char) packet[i]);
         }
 
         return new RipcomPacket(destinationIP.toString(), sourceIP.toString(), packetType,
-                number, contents.toString());
+                number, length, contents.toString());
     }
 
     /**
