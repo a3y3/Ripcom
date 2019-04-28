@@ -1,6 +1,12 @@
-import java.io.*;
+import java.io.DataInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.net.*;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * Represents a single Rover. To run this, start a new Rover with
@@ -19,6 +25,7 @@ public class Rover extends Thread {
     private ArrayList<RoutingTableEntry> routingTable;
     private HashMap<String, Timer> timers = new HashMap<>();
     private HashMap<Integer, RipcomPacket> window = new HashMap<>();
+    private HashMap<Integer, Timer> packetTimer = new HashMap<>();
 
     private int seqNumber = 0;
     private int ackNumber = 0;
@@ -33,6 +40,7 @@ public class Rover extends Thread {
     private final static int UDP_SEND_MAX_RETRIES = 10;
     private final static int BUFFER_CAPACITY = 200;
     private final static int WINDOW_SIZE = 1;
+    private final static int PACKET_TIMEOUT = 1000; //retry sending packet in 1 second
 
     private final String selfIP;
 
@@ -669,7 +677,7 @@ public class Rover extends Thread {
             RipcomPacketManager ripcomPacketManager =
                     new RipcomPacketManager();
             RipcomPacket ripcomPacket =
-                    ripcomPacketManager.getPacketFromByteRepresentation(packet.getData());
+                    ripcomPacketManager.getRipcomPacket(packet.getData());
 
             if (verboseLevel <= 1) {
                 System.out.println("Received a Ripcom packet.");
@@ -687,16 +695,52 @@ public class Rover extends Thread {
         }
     }
 
+    private void cancelTimerForPacket(int number) {
+        window.remove(number);
+        if (verboseLevel <= 1) {
+            System.out.println("Number of elements in window: " + window.size());
+            System.out.println("Removing timer for this packet: " + number);
+        }
+        Timer timer = packetTimer.get(number);
+        timer.cancel();
+        packetTimer.remove(number);
+    }
+
+    /**
+     * Used to do various operations depending upon the packetType inside a Ripcom
+     * packet. If the received message is:
+     * 1. an ACK, this function adds the next expected packet to the window and sends
+     * it.
+     * 2. a SEQ, it sends an ACK for the next packet that is expected.
+     * 3. a FIN, it sends a FIN_ACK.
+     * 4. a FIN_ACK, it stops the file sending.
+     *
+     * @param ripcomPacket a ripcomPacket that was intended for this Rover. In other
+     *                     words, this is a packet that has the destination address as
+     *                     the address of this Rover, and should be opened and
+     *                     inspected instead of forwarding.
+     * @throws IOException          see {@code addToWindow()}
+     * @throws InterruptedException see {@code sendPacket()}
+     */
     private void acceptPacket(RipcomPacket ripcomPacket) throws IOException, InterruptedException {
         RipcomPacket.Type packetType = ripcomPacket.getPacketType();
         switch (packetType) {
             case SEQ:
-                //Someone is sending a message, must ACK!
-                if (ripcomPacket.getNumber() < ackNumber) {
-                    return; //ignore duplicate packet
+                if (verboseLevel <= 1) {
+                    System.out.println("Received SEQ " + ripcomPacket.getNumber());
                 }
-                ackNumber++;
-                receivedContent += ripcomPacket.getContents();
+                boolean expectedPacket = true;
+                if (ripcomPacket.getNumber() != ackNumber) {
+                    expectedPacket = false;
+                    if (verboseLevel <= 1) {
+                        System.out.println("Received a wrong packet: " + ripcomPacket.getNumber());
+                        System.out.println("Sending ACK again for packet: " + ackNumber);
+                    }
+                }
+                if (expectedPacket) {
+                    ackNumber++;
+                    receivedContent += ripcomPacket.getContents();
+                }
                 String destinationIP = ripcomPacket.getSourceIP();
                 RipcomPacket ackPacket = new RipcomPacket(
                         destinationIP,
@@ -704,18 +748,28 @@ public class Rover extends Thread {
                         RipcomPacket.Type.ACK,
                         ackNumber,
                         "");
+                window.remove(ackNumber - 1);
+                window.put(ackNumber, ackPacket);
                 sendPacket(ackPacket);
                 break;
             case ACK:
                 int number = ripcomPacket.getNumber();
-                window.remove(number - 1);
+                if (verboseLevel <= 1) {
+                    System.out.println("Received ACK " + number);
+                }
+                cancelTimerForPacket(number - 1);
                 addToWindow(ripcomPacket.getSourceIP());
                 RipcomPacket nextPacket = window.get(number);
                 sendPacket(nextPacket);
+                startTimerForPacket(nextPacket.getNumber());
                 break;
             case FIN:
+                if (verboseLevel <= 1) {
+                    System.out.println("Received FIN " + ripcomPacket.getNumber());
+                }
                 receivedContent += ripcomPacket.getContents();
                 System.out.println(receivedContent);
+                ackNumber++;
                 destinationIP = ripcomPacket.getSourceIP();
                 RipcomPacket finAckPacket = new RipcomPacket(
                         destinationIP,
@@ -723,10 +777,23 @@ public class Rover extends Thread {
                         RipcomPacket.Type.FIN_ACK,
                         ackNumber,
                         "");
+                window.remove(ackNumber - 1);
+                if (verboseLevel <= 1) {
+                    System.out.println("Sending FIN_ACK packet, ackNumber is " + ackNumber);
+                }
+                window.put(ackNumber, finAckPacket);
                 sendPacket(finAckPacket);
                 break;
             case FIN_ACK:
+                if (verboseLevel <= 1) {
+                    System.out.println("Received FIN_ACK " + ripcomPacket.getNumber());
+                }
+                cancelTimerForPacket(seqNumber - 1);
                 System.out.println("Finished sending all data");
+                if (verboseLevel <= 1) {
+                    System.out.println("Completed sending. Window size: " + window.size());
+                    System.out.println("Packet timer size: " + packetTimer.size());
+                }
                 break;
         }
     }
@@ -811,12 +878,42 @@ public class Rover extends Thread {
         seqNumber++;
     }
 
-    private void fragmentAndSend(String destinationIP) throws IOException {
-        for (int i = 0; i < WINDOW_SIZE; i++) {
-            addToWindow(destinationIP);
-        }
+    private void startTimerForPacket(int number) {
+        Timer timer = new Timer();
+        packetTimer.put(number, timer);
+
+        timer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                if (verboseLevel <= 1) {
+                    System.out.println("Packet number " + number + " timed out!");
+                }
+                RipcomPacket ripcomPacket = window.get(number);
+                try {
+                    sendPacket(ripcomPacket);
+                    startTimerForPacket(ripcomPacket.getNumber());
+                } catch (IOException | InterruptedException e) {
+                    e.printStackTrace();
+                }
+
+            }
+        }, PACKET_TIMEOUT);
     }
 
+    private void startSendingIfFlag() throws IOException, InterruptedException {
+        if (destinationIP != null) {
+            File file = new File(fileName);
+            dataInputStream = new DataInputStream(new FileInputStream(file));
+            for (int i = 0; i < WINDOW_SIZE; i++) {
+                addToWindow(destinationIP);
+            }
+            for (int i = 0; i < WINDOW_SIZE; i++) {
+                RipcomPacket ripcomPacket = window.get(i);
+                sendPacket(ripcomPacket);
+                startTimerForPacket(ripcomPacket.getNumber());
+            }
+        }
+    }
 
     /**
      * Starts a new Rover, and initialises threads.
@@ -830,14 +927,6 @@ public class Rover extends Thread {
         Rover rover = new Rover();
         new ArgumentParser().parseArguments(args, rover);
         rover.startThreads();
-        if (rover.destinationIP != null) {
-            File file = new File(rover.fileName);
-            rover.dataInputStream = new DataInputStream(new FileInputStream(file));
-            rover.fragmentAndSend(rover.destinationIP);
-            for (int i = 0; i < WINDOW_SIZE; i++) {
-                RipcomPacket ripcomPacket = rover.window.get(i);
-                rover.sendPacket(ripcomPacket);
-            }
-        }
+        rover.startSendingIfFlag();
     }
 }

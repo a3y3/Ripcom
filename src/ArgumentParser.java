@@ -41,7 +41,7 @@ class ArgumentParser {
                     displayHelp();
                 }
                 if (argument.equals(VERBOSE_S) || argument.equals(VERBOSE_L)) {
-                    rover.verboseOutputs = true;
+                    rover.verboseOutputs = false;
                     rover.verboseLevel = Integer.parseInt(args[i + 1]);
                 }
                 if (argument.equals(MULTICAST_PORT_S) || argument.equals(MULTICAST_PORT_L)) {

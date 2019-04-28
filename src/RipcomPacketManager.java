@@ -21,7 +21,7 @@ class RipcomPacketManager {
      * @param packet byte representation of a RipcomPacket
      * @return instance of RipcomPacket
      */
-    RipcomPacket getPacketFromByteRepresentation(byte[] packet) {
+    RipcomPacket getRipcomPacket(byte[] packet) {
         StringBuilder destinationIP = getIP(DESTINATION_IP_OFFSET, packet);
 
         StringBuilder sourceIP = getIP(SOURCE_IP_OFFSET, packet);
