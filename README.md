@@ -1,7 +1,8 @@
 # What is Ripcom?
 Ripcom is an implementation of the Routing Information Protocol ([RIP v2](https://www.google.com "Click to see the RFC")), written from scratch in Java. `Rover.java` represents a Rover on Mars. Several of these Rovers communicate with each other and find the shortest path between them using RIP. 
 
-Using this shortest path, these Rovers can transmit a large file reliably through the Ripcom protocol. See RipomProtocol.pdf for more details.
+Using this shortest path, these Rovers can transmit a large file reliably through the 
+Ripcom protocol. See RipomProtocol.md for more details.
 
 ### How to build:
 Compile Rover and dependencies using `javac *.java`

@@ -75,6 +75,7 @@ class ArgumentParser {
                 }
             }
         } catch (Exception e) {
+            e.printStackTrace();
             throw new ArgumentException("Your arguments are incorrect. Please see " + HELP_L +
                     " for help and usage.");
         }
@@ -88,7 +89,7 @@ class ArgumentParser {
             missingArgument = true;
         }
         if (rover.ripPort == 0) {
-            System.out.println("Warning: Port not specified, using port " + 32768);
+            System.out.println("Warning: RIP Source Port not specified, using port " + 32768);
             rover.ripPort = 32768;
             missingArgument = true;
         }
