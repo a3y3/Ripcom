@@ -37,9 +37,10 @@ public class Rover extends Thread {
     private final static int INFINITY = 16;     //Max hop count in RIP is 15
     private final static int TIMEOUT = 10000;   // unreachable at 10 secs
     private final static int UDP_SEND_MAX_RETRIES = 10;
-    private final static int BUFFER_CAPACITY = 200;
+    private final static int BUFFER_CAPACITY = 5000;
     private final static int WINDOW_SIZE = 1;
     private final static int PACKET_TIMEOUT = 1000; //retry sending packet in 1 second
+    private final static int RECEIVE_SIZE = 5056;
 
     private final String selfIP;
 
@@ -620,7 +621,7 @@ public class Rover extends Thread {
      */
     private void udpServer() throws IOException, InterruptedException {
         DatagramSocket server = new DatagramSocket(udpPort);
-        byte[] buffer = new byte[256];
+        byte[] buffer = new byte[RECEIVE_SIZE];
         while (true) {
             DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
             server.receive(packet);
@@ -867,16 +868,13 @@ public class Rover extends Thread {
             type = RipcomPacket.Type.FIN;
         }
         if (BUFFER_CAPACITY > lengthCounter) {
-            System.out.println("Stripping because length counter = " + lengthCounter);
             contents = stripContents(contents);
         } else {
             lengthCounter -= BUFFER_CAPACITY;
         }
 
-        System.out.println("Adding this packet to window:");
         RipcomPacket ripcomPacket = new RipcomPacket(destinationIP,
                 getPrivateIP(roverID), type, seqNumber, contents.length, contents);
-        System.out.println(ripcomPacket);
         window.put(seqNumber, ripcomPacket);
         seqNumber++;
     }
@@ -901,10 +899,12 @@ public class Rover extends Thread {
                 }
                 RipcomPacket ripcomPacket = window.get(number);
                 try {
-                    sendPacket(ripcomPacket);
-                    startTimerForPacket(ripcomPacket.getNumber());
+                    if (ripcomPacket != null) {
+                        sendPacket(ripcomPacket);
+                        startTimerForPacket(ripcomPacket.getNumber());
+                    }
                 } catch (IOException | InterruptedException e) {
-                    e.printStackTrace();
+                    System.err.println();
                 }
 
             }
