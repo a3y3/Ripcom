@@ -7,8 +7,9 @@ Note: This document is best viewed on a mark down viewer, such as Github.
 NASA has sent Rovers on Mars. They move through the rough terrain on Mars and 
 continuously send data to one another. Needless to say, the medium is noisy.
 
-The Ripcom Protocol is designed the provide a reliable data transfer mechanism for 
-these Rovers that results in lesser number of packets and avoids the overhead TCP has.
+The Ripcom Protocol is designed to provide a reliable data transfer mechanism for 
+these Rovers that results in lesser number of packets and avoids the overhead that TCP 
+has.
 
 ### Introduction
 
@@ -62,7 +63,7 @@ it's routing tables.
 
 ##### Source IP
 Each Rover MUST send its own IP address in the Source IP header. This lets the 
-destination Rover know whom to send ACKS to.
+destination Rover know whom to send ACKs to.
 
 ##### Packet Type
 This field is of size 1 byte. It can be either of the following types:
@@ -77,7 +78,7 @@ type, the receiver Rover declares the transfer to have finished.
  protocol, as the length of the file is not necessary to be known beforehand.
  
 ##### Number
-The packet number. On receiving ACK for packet X, a Rover MUST send packet X+1, and on 
+The packet number. On receiving ACK for packet X, a Rover MUST send packet X, and on 
 receiving a SEQ for packet X-1, a Rover MUST send an ACK for packet X.
 
 ##### Length
@@ -107,7 +108,7 @@ output file the message that was received.
 #### Timers
 Each Ripcom Packet has a timer attached to it. That is, each Ripcom Packet that is of 
 type SEQ or FIN. An important realization during the development was that ACKs do not 
-need timers, since ACKS that are lost will be treated as SEQ packets not reaching, and 
+need timers, since ACKs that are lost will be treated as SEQ packets not reaching, and 
 the sender will simply send the packet again. If the receiver receives a duplicate SEQ 
 (or it receives a packet that it was not expecting) it sends back an ACK again for the 
 number it is expecting to receive.
@@ -124,7 +125,7 @@ checksum by default.
 
 For testing, a 5 MB bible was transferred from Rover #2 to Rover #6, in a network of 5 
 Rovers with a diamond shape topology. The network had a packet loss of 10 %. This was 
-set was IP tables using the command `iptables -A INPUT -m statistic --mode random 
+setup with iptables  using the command `iptables -A INPUT -m statistic --mode random 
 --probability 0.1 -p udp --destination-port 6767 -i eth0 -j DROP`
 The Rover was started with the command `java Rover -r 2 -d 10.0.6.0 -f bible`.
  The results are documented below:
@@ -135,7 +136,7 @@ The Rover was started with the command `java Rover -r 2 -d 10.0.6.0 -f bible`.
  | #2                | 1 minute 37 sec |
  | #3                | 1 minute 25 sec |
  | #4                | 1 minute 30 sec |
- | #2                | 1 minute 27 sec |
+ | #5                | 1 minute 27 sec |
 
 In a network with no packet loss, the protocol transfers the file almost instantaneously. 
 
