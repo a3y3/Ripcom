@@ -25,12 +25,6 @@ import java.util.ArrayList;
  * @author Soham Dongargaonkar [sd4324] on 19/4/19
  */
 class RipcomPacket {
-    enum Type {
-        SEQ,
-        ACK,
-        FIN,
-        FIN_ACK
-    }
 
     private String destinationIP;   //bytes 0 - 3
     private String sourceIP;        //bytes 4 - 7

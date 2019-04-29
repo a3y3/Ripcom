@@ -32,20 +32,20 @@ class RipcomPacketManager {
 
         StringBuilder sourceIP = getIP(SOURCE_IP_OFFSET, packet);
 
-        RipcomPacket.Type packetType;
+        Type packetType;
         int type = packet[PACKET_TYPE_OFFSET];
         switch (type) {
             case 1:
-                packetType = RipcomPacket.Type.SEQ;
+                packetType = Type.SEQ;
                 break;
             case 2:
-                packetType = RipcomPacket.Type.ACK;
+                packetType = Type.ACK;
                 break;
             case 3:
-                packetType = RipcomPacket.Type.FIN_ACK;
+                packetType = Type.FIN_ACK;
                 break;
             default:
-                packetType = RipcomPacket.Type.FIN;
+                packetType = Type.FIN;
         }
 
         byte[] numsArray = new byte[4];

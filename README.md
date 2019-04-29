@@ -1,5 +1,8 @@
 # What is Ripcom?
-Ripcom is an implementation of the Routing Information Protocol ([RIP v2](https://www.google.com "Click to see the RFC")), written from scratch in Java. `Rover.java` represents a Rover on Mars. Several of these Rovers communicate with each other and find the shortest path between them using RIP. 
+Ripcom is an implementation of the Routing Information Protocol ([RIP v2](https://tools
+.ietf.org/html/rfc2453 "Click to see the RFC")), written from scratch in Java. `Rover
+.java` represents a Rover on Mars. Several of these Rovers communicate with each other
+ and find the shortest path between them using RIP. 
 
 Using this shortest path, these Rovers can transmit a large file reliably through the 
 Ripcom protocol. See RipomProtocol.md for more details.
@@ -9,7 +12,8 @@ Compile Rover and dependencies using `javac *.java`
 
 Run Rover using `java Rover -r ROUTER_ID`. `ROVER_ID` should be an 8 bit number.
 
-There are several other optional flags you can use to fine tune it. See the full list using `java Rover --help` or `java Rover -h`.
+There are several other optional flags you can use to fine tune it. See the full list 
+using `java Rover --help` or `java Rover -h`.
 
 ### Example:
 
@@ -26,7 +30,8 @@ There are several other optional flags you can use to fine tune it. See the full
 
 Note that the only field that is not optional is `-r`.
 
-Now that a Rover is running, you can run other Rovers on other computers (or VMs, or Docker containers!) and see the Rover calculate the shortest path.
+Now that a Rover is running, you can run other Rovers on other computers (or VMs, or 
+Docker containers!) and see the Rover calculate the shortest path.
 
 ##### Author
-Soham Dongargaonkar , RIT ID: sd4324
+Soham Dongargaonkar

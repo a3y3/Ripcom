@@ -681,7 +681,7 @@ public class Rover extends Thread {
      * @throws InterruptedException see {@code sendPacket()}
      */
     private void acceptPacket(RipcomPacket ripcomPacket) throws IOException, InterruptedException {
-        RipcomPacket.Type packetType = ripcomPacket.getPacketType();
+        Type packetType = ripcomPacket.getPacketType();
         switch (packetType) {
             case SEQ:
                 if (verboseLevel <= 1) {
@@ -708,7 +708,7 @@ public class Rover extends Thread {
                 RipcomPacket ackPacket = new RipcomPacket(
                         destinationIP,
                         getPrivateIP(roverID),
-                        RipcomPacket.Type.ACK,
+                        Type.ACK,
                         ackNumber,
                         0,
                         new byte[0]);
@@ -741,7 +741,7 @@ public class Rover extends Thread {
                 RipcomPacket finAckPacket = new RipcomPacket(
                         destinationIP,
                         getPrivateIP(roverID),
-                        RipcomPacket.Type.FIN_ACK,
+                        Type.FIN_ACK,
                         ackNumber,
                         0,
                         new byte[0]);
@@ -862,10 +862,10 @@ public class Rover extends Thread {
      * @throws IOException while reading from the input stream.
      */
     private void addToWindow(String destinationIP) throws IOException {
-        RipcomPacket.Type type = RipcomPacket.Type.SEQ;
+        Type type = Type.SEQ;
         byte[] contents = new byte[BUFFER_CAPACITY];
         if (dataInputStream.read(contents) == -1) {
-            type = RipcomPacket.Type.FIN;
+            type = Type.FIN;
         }
         if (BUFFER_CAPACITY > lengthCounter) {
             contents = stripContents(contents);
