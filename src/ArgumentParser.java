@@ -1,4 +1,7 @@
 /**
+ * Parses arguments passed in String args[] and modifies the passed {@code rover}'s
+ * instance variables accordingly.
+ *
  * @author Soham Dongargaonkar [sd4324] on 15/4/19
  */
 class ArgumentParser {
@@ -186,7 +189,7 @@ class ArgumentParser {
                 "1: Print only Ripcom messages that are received and " +
                 "should be forwarded.\n " +
                 "2: Default option. Print a Ripcom message only when it reaches " +
-                "the  destination address.");   //TODO
+                "the  destination address.");
         System.out.println();
 
         System.exit(1);
