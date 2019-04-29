@@ -28,8 +28,7 @@ public class Rover extends Thread {
     private int seqNumber = 0;
     private int ackNumber = 0;
     private DataInputStream dataInputStream;
-    private BufferedWriter bufferedWriter;
-    private String receivedContents = "";
+    private FileOutputStream fileOutputStream;
     private long lengthCounter;
 
     //final variables
@@ -647,6 +646,12 @@ public class Rover extends Thread {
         }
     }
 
+    /**
+     * Cancels a timer for a packet and removes it from {@code window}, and
+     * {@code packetTimer}.
+     *
+     * @param number the SEQ or FIN number of the packet.
+     */
     private void cancelTimerForPacket(int number) {
         window.remove(number);
         if (verboseLevel <= 1) {
@@ -691,13 +696,12 @@ public class Rover extends Thread {
                 }
                 if (expectedPacket) {
                     ackNumber++;
-                    String message = ripcomPacket.getContents();
-                    receivedContents += message;
-                    if (bufferedWriter == null) {
-                        bufferedWriter =
-                                new BufferedWriter(new PrintWriter("output"));
+                    byte[] message = ripcomPacket.getContents();
+                    if (fileOutputStream == null) {
+                        fileOutputStream =
+                                new FileOutputStream("output");
                     }
-                    bufferedWriter.write(message);
+                    fileOutputStream.write(message);
                 }
                 String destinationIP = ripcomPacket.getSourceIP();
                 RipcomPacket ackPacket = new RipcomPacket(
@@ -706,7 +710,7 @@ public class Rover extends Thread {
                         RipcomPacket.Type.ACK,
                         ackNumber,
                         0,
-                        "");
+                        new byte[0]);
                 window.remove(ackNumber - 1);
                 window.put(ackNumber, ackPacket);
                 sendPacket(ackPacket);
@@ -726,16 +730,11 @@ public class Rover extends Thread {
                 if (verboseLevel <= 1) {
                     System.out.println("Received FIN " + ripcomPacket.getNumber());
                 }
-                String message = ripcomPacket.getContents();
-                receivedContents += message;
-                bufferedWriter.write(message);
-                bufferedWriter.close();
+                byte[] message = ripcomPacket.getContents();
+                fileOutputStream.write(message);
+                fileOutputStream.close();
                 System.out.println("Received message successfully. See file output " +
-                        "for the final output or run with java Rover -v 2 to see output" +
-                        " on STDOUT.");
-                if (verboseLevel <= 2) {
-                    System.out.println("Message: " + receivedContents);
-                }
+                        "for the final output.");
                 ackNumber++;
                 destinationIP = ripcomPacket.getSourceIP();
                 RipcomPacket finAckPacket = new RipcomPacket(
@@ -744,7 +743,7 @@ public class Rover extends Thread {
                         RipcomPacket.Type.FIN_ACK,
                         ackNumber,
                         0,
-                        "");
+                        new byte[0]);
                 window.remove(ackNumber - 1);
                 if (verboseLevel <= 1) {
                     System.out.println("Sending FIN_ACK packet, ackNumber is " + ackNumber);
@@ -803,8 +802,14 @@ public class Rover extends Thread {
         return routingTableEntry;
     }
 
-    private void sendPacket(RipcomPacket ripcomPacket) throws IOException,
-            InterruptedException {
+    /**
+     * Sends a RipcomPacket.
+     *
+     * @param ripcomPacket the packet that needs to be sent
+     * @throws IOException          see {@code datagramSocket.send(datagramPacket)}
+     * @throws InterruptedException see {@code getEntryForDestinationIP()}
+     */
+    private void sendPacket(RipcomPacket ripcomPacket) throws IOException, InterruptedException {
         String destinationIP = ripcomPacket.getDestinationIP();
         RoutingTableEntry routingTableEntry = getEntryForDestinationIP(destinationIP);
         if (routingTableEntry != null) {
@@ -823,14 +828,28 @@ public class Rover extends Thread {
         }
     }
 
-    private String stripContents(String contents) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < contents.length(); i++) {
-            char c = contents.charAt(i);
-            if (c != 0) sb.append(c);
-            else break;
+    /**
+     * Calculates what the size of contents[] should be, then strips down the extra
+     * read characters and returns a new buffer.
+     * <p>
+     * This is only called when {@code BUFFER_SIZE} exceeds the number of bytes read
+     * from the input stream.
+     *
+     * @param contents the contents that need to be stripped down.
+     * @return the stripped down array.
+     */
+    private byte[] stripContents(byte[] contents) {
+        int size = 0;
+        for (int i = 0; i < contents.length; i++) {
+            if (contents[i] == 0) {
+                size = i;
+                break;
+            }
         }
-        return sb.toString();
+
+        byte[] buffer = new byte[size];
+        System.arraycopy(contents, 0, buffer, 0, size);
+        return buffer;
     }
 
     /**
@@ -843,24 +862,33 @@ public class Rover extends Thread {
      */
     private void addToWindow(String destinationIP) throws IOException {
         RipcomPacket.Type type = RipcomPacket.Type.SEQ;
-        byte[] dataBuffer = new byte[BUFFER_CAPACITY];
-        if (dataInputStream.read(dataBuffer) == -1) {
+        byte[] contents = new byte[BUFFER_CAPACITY];
+        if (dataInputStream.read(contents) == -1) {
             type = RipcomPacket.Type.FIN;
         }
-        String contents = new String(dataBuffer);
         if (BUFFER_CAPACITY > lengthCounter) {
+            System.out.println("Stripping because length counter = " + lengthCounter);
             contents = stripContents(contents);
         } else {
             lengthCounter -= BUFFER_CAPACITY;
         }
 
-
+        System.out.println("Adding this packet to window:");
         RipcomPacket ripcomPacket = new RipcomPacket(destinationIP,
-                getPrivateIP(roverID), type, seqNumber, contents.length(), contents);
+                getPrivateIP(roverID), type, seqNumber, contents.length, contents);
+        System.out.println(ripcomPacket);
         window.put(seqNumber, ripcomPacket);
         seqNumber++;
     }
 
+    /**
+     * Starts a new Timer for each sent packet. When the timer runs out, a new packet
+     * is sent again. Note that the newly sent packet will also have a timer attached
+     * to it.
+     *
+     * @param number the SEQ (or FIN) number of the packet, used for looking up the
+     *               packet itself in the window.
+     */
     private void startTimerForPacket(int number) {
         Timer timer = new Timer();
         packetTimer.put(number, timer);
@@ -883,10 +911,18 @@ public class Rover extends Thread {
         }, PACKET_TIMEOUT);
     }
 
+    /**
+     * If the flags -f and -d are set, this method starts sending packets according to
+     * {@code WINDOW_SIZE} to the destination address.
+     *
+     * @throws IOException          see {@code sendPacket}
+     * @throws InterruptedException see {@code sendPacket}
+     */
     private void startSendingIfFlag() throws IOException, InterruptedException {
         if (destinationIP != null) {
             File file = new File(fileName);
-            lengthCounter = fileName.length();
+            lengthCounter = file.length();
+            System.out.println();
             dataInputStream = new DataInputStream(new FileInputStream(file));
             for (int i = 0; i < WINDOW_SIZE; i++) {
                 addToWindow(destinationIP);

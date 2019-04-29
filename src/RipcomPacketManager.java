@@ -1,6 +1,14 @@
 import java.nio.ByteBuffer;
 
 /**
+ * For now, the purpose of this class is only to build a new RipcomPacket from a byte
+ * array.
+ * <p>
+ * The function {@code getRipcomPacket(byte[] packet)} should not be in RipcomPacket as
+ * a new RipcomPacket MUST be instantiated with a constructor containing all the
+ * different values. This is  to prevent accidental calls to {@code getBytes()} on a
+ * RipcomPacket that was created with a default constructor.
+ *
  * @author Soham Dongargaonkar [sd4324] on 19/4/19
  */
 
@@ -11,9 +19,6 @@ class RipcomPacketManager {
     private static final int NUMBER_OFFSET = 9;
     private static final int LENGTH_OFFSET = 13;
     private static final int CONTENTS_OFFSET = 17;
-
-    RipcomPacketManager() {
-    }
 
     /**
      * Given a byte representation of a ripcom packet, creates a new instance of
@@ -51,13 +56,11 @@ class RipcomPacketManager {
         System.arraycopy(packet, LENGTH_OFFSET, lengthArray, 0, 4);
         int length = ByteBuffer.wrap(lengthArray).getInt();
 
-        StringBuilder contents = new StringBuilder();
-        for (int i = CONTENTS_OFFSET; i < CONTENTS_OFFSET + length; i++) {
-            contents.append((char) packet[i]);
-        }
+        byte[] contents = new byte[length];
+        System.arraycopy(packet, CONTENTS_OFFSET, contents, 0, length);
 
         return new RipcomPacket(destinationIP.toString(), sourceIP.toString(), packetType,
-                number, length, contents.toString());
+                number, length, contents);
     }
 
     /**

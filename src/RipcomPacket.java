@@ -2,8 +2,26 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+/*
+ * RipcomPacket.java
+ *
+ * Version:
+ *   2.0
+ *
+ * Revisions:
+ *   1.1: Added enum as packetTypes instead of Strings
+ *   1.2: Added length
+ *   2.0: Changed content from String to byte[] (yay for supporting all file types!)
+ *
+ */
 
 /**
+ * Represents a RipcomPacket. RipcomPackets can be queued and sent, and form a good
+ * roadway to implement Selective Acks {@see RFC 2018}.
+ *
+ * <p>
+ * The order of the instance variables is important. See RipcomProtocol.pdf to know why.
+ *
  * @author Soham Dongargaonkar [sd4324] on 19/4/19
  */
 class RipcomPacket {
@@ -19,10 +37,10 @@ class RipcomPacket {
     private Type packetType;        //bytes 8
     private int number;             //bytes 9 - 12
     private int length;             //bytes 13 - 16
-    private String contents;        //bytes 17 - ..
+    private byte[] contents;        //bytes 17 - ..
 
     RipcomPacket(String destinationIP, String sourceIP, Type packetType, int number,
-                 int length, String contents) {
+                 int length, byte[] contents) {
         this.destinationIP = destinationIP;
         this.sourceIP = sourceIP;
         this.packetType = packetType;
@@ -48,11 +66,7 @@ class RipcomPacket {
         return number;
     }
 
-    int getLength() {
-        return length;
-    }
-
-    String getContents() {
+    byte[] getContents() {
         return contents;
     }
 
@@ -95,7 +109,7 @@ class RipcomPacket {
             arrayList.add(l);                           //Length
         }
 
-        byte[] contentsBytes = contents.getBytes();
+        byte[] contentsBytes = contents;
         for (byte b : contentsBytes) {
             arrayList.add(b);                           //Message
         }
@@ -115,6 +129,6 @@ class RipcomPacket {
                 "Type: " + packetType + "\n" +
                 "Number: " + number + "\n" +
                 "Length: " + length + "\n" +
-                "Contents: " + contents + "\n";
+                "Contents: <NOT DISPLAYED>\n";
     }
 }
