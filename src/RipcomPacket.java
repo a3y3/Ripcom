@@ -115,7 +115,6 @@ class RipcomPacket {
                 "Type: " + packetType + "\n" +
                 "Number: " + number + "\n" +
                 "Length: " + length + "\n" +
-                "Contents: " + contents + "\n" +
-                "Contents length: " + contents.length() + "\n";     //TODO remove
+                "Contents: " + contents + "\n";
     }
 }

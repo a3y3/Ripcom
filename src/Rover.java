@@ -175,7 +175,7 @@ public class Rover extends Thread {
      *                              datagram packet.
      */
     private void sendRIPMessage() throws UnknownHostException {
-        byte[] buffer = getRIPPacket(true);
+        byte[] buffer = getRIPPacket();
         InetAddress iGroup = null;
 
         try {
@@ -246,10 +246,10 @@ public class Rover extends Thread {
      *
      * @return the RIP packet in a byte array
      */
-    private byte[] getRIPPacket(boolean isRequest) throws UnknownHostException {
+    private byte[] getRIPPacket() throws UnknownHostException {
         ArrayList<Byte> arrayList = new ArrayList<>();
 
-        byte command = (byte) (isRequest ? 1 : 2);
+        byte command = (byte) (1);
         byte zero = 0;
 
         arrayList.add(command);     // Command
@@ -695,7 +695,7 @@ public class Rover extends Thread {
                     receivedContents += message;
                     if (bufferedWriter == null) {
                         bufferedWriter =
-                                new BufferedWriter(new PrintWriter("here.txt"));
+                                new BufferedWriter(new PrintWriter("output"));
                     }
                     bufferedWriter.write(message);
                 }
